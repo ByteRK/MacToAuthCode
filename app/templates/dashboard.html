@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title }} - 管理后台</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+  <body class="dashboard-shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Auth Code Control Center</p>
+        <h1>{{ title }}</h1>
+        <p class="muted">已登录管理员：{{ admin_username }}</p>
+      </div>
+      <div class="hero-actions">
+        <a class="ghost-btn" href="/api/admin/export-template">下载导入模板</a>
+        <a class="primary-btn" href="/api/admin/export-allocations">导出已分配数据</a>
+        <a class="ghost-btn" href="/logout">退出登录</a>
+      </div>
+    </header>
+
+    <section class="card-grid" id="summary-cards"></section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>导入授权码</h2>
+          <p class="muted">支持 Excel 首个工作表导入，可在文件内提供 `pid` 列，也可在这里填写默认 PID。</p>
+        </div>
+      </div>
+      <form id="import-form" class="import-form">
+        <label>
+          <span>默认 PID</span>
+          <input type="text" name="default_pid" placeholder="可选，文件中没有 pid 列时使用">
+        </label>
+        <label class="file-field">
+          <span>Excel 文件</span>
+          <input type="file" name="file" accept=".xlsx" required>
+        </label>
+        <button type="submit" class="primary-btn">开始导入</button>
+      </form>
+      <div id="import-result" class="muted"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>已分配记录</h2>
+          <p class="muted">按 PID、MAC 或授权码搜索。</p>
+        </div>
+        <form id="allocation-search-form" class="inline-form">
+          <input id="allocation-search" type="search" placeholder="搜索 PID / MAC / 授权码">
+          <button type="submit" class="ghost-btn">查询</button>
+        </form>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>PID</th>
+              <th>MAC</th>
+              <th>显示标识</th>
+              <th>批次</th>
+              <th>分配时间</th>
+            </tr>
+          </thead>
+          <tbody id="allocations-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>库存概览</h2>
+          <p class="muted">查看不同 PID 的授权码库存和使用情况。</p>
+        </div>
+        <form id="code-search-form" class="inline-form">
+          <select id="code-status">
+            <option value="all">全部状态</option>
+            <option value="available">可分配</option>
+            <option value="assigned">已分配</option>
+          </select>
+          <input id="code-search" type="search" placeholder="搜索 PID / MAC / 授权码">
+          <button type="submit" class="ghost-btn">查询</button>
+        </form>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>PID</th>
+              <th>显示标识</th>
+              <th>状态</th>
+              <th>MAC</th>
+              <th>批次</th>
+              <th>载荷预览</th>
+              <th>分配时间</th>
+            </tr>
+          </thead>
+          <tbody id="codes-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>最近请求日志</h2>
+          <p class="muted">实时观察设备请求和库存消耗。</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>PID</th>
+              <th>MAC</th>
+              <th>动作</th>
+              <th>授权码</th>
+              <th>说明</th>
+              <th>来源 IP</th>
+            </tr>
+          </thead>
+          <tbody id="logs-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+</html>

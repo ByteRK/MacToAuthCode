@@ -1,3 +1,4 @@
+import json
 import os
 import secrets
 import sys
@@ -36,14 +37,52 @@ class Settings:
 
 def load_settings() -> Settings:
     base_dir = runtime_base_dir()
-    data_dir = Path(os.getenv("AUTH_PLATFORM_DATA_DIR", base_dir / "data"))
+    config_path = Path(os.getenv("AUTH_PLATFORM_CONFIG_FILE", base_dir / "config.json"))
+    file_config: dict[str, str | int] = {}
+    if config_path.exists():
+        file_config = json.loads(config_path.read_text(encoding="utf-8"))
 
     return Settings(
-        app_name=os.getenv("AUTH_PLATFORM_NAME", "授权码分发平台"),
-        host=os.getenv("AUTH_PLATFORM_HOST", "0.0.0.0"),
-        port=int(os.getenv("AUTH_PLATFORM_PORT", "8080")),
-        admin_username=os.getenv("AUTH_PLATFORM_ADMIN_USER", "admin"),
-        admin_password=os.getenv("AUTH_PLATFORM_ADMIN_PASSWORD", "ChangeMe123!"),
-        secret_key=os.getenv("AUTH_PLATFORM_SECRET_KEY", secrets.token_hex(16)),
-        data_dir=data_dir,
+        app_name=str(
+            os.getenv(
+                "AUTH_PLATFORM_NAME",
+                file_config.get("app_name", "授权码分发平台"),
+            )
+        ),
+        host=str(
+            os.getenv(
+                "AUTH_PLATFORM_HOST",
+                file_config.get("host", "0.0.0.0"),
+            )
+        ),
+        port=int(
+            os.getenv(
+                "AUTH_PLATFORM_PORT",
+                str(file_config.get("port", "8080")),
+            )
+        ),
+        admin_username=str(
+            os.getenv(
+                "AUTH_PLATFORM_ADMIN_USER",
+                file_config.get("admin_username", "admin"),
+            )
+        ),
+        admin_password=str(
+            os.getenv(
+                "AUTH_PLATFORM_ADMIN_PASSWORD",
+                file_config.get("admin_password", "ChangeMe123!"),
+            )
+        ),
+        secret_key=str(
+            os.getenv(
+                "AUTH_PLATFORM_SECRET_KEY",
+                file_config.get("secret_key", secrets.token_hex(16)),
+            )
+        ),
+        data_dir=Path(
+            os.getenv(
+                "AUTH_PLATFORM_DATA_DIR",
+                str(file_config.get("data_dir", base_dir / "data")),
+            )
+        ),
     )

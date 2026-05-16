@@ -1,3 +1,5 @@
+import hashlib
+import json
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
@@ -9,6 +11,8 @@ CREATE TABLE IF NOT EXISTS auth_codes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     pid TEXT NOT NULL,
     code TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    payload_hash TEXT NOT NULL,
     source_batch TEXT,
     status TEXT NOT NULL DEFAULT 'available',
     assigned_mac TEXT,
@@ -28,7 +32,7 @@ CREATE TABLE IF NOT EXISTS distribution_logs (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_codes_pid_code ON auth_codes(pid, code);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_codes_pid_payload_hash ON auth_codes(pid, payload_hash);
 CREATE INDEX IF NOT EXISTS idx_auth_codes_pid_status ON auth_codes(pid, status);
 CREATE INDEX IF NOT EXISTS idx_auth_codes_pid_assigned_mac ON auth_codes(pid, assigned_mac);
 CREATE INDEX IF NOT EXISTS idx_distribution_logs_pid_mac ON distribution_logs(pid, mac);
@@ -69,17 +73,18 @@ class Database:
         columns = self._table_columns(conn, "auth_codes")
         if not columns:
             return
-        if "pid" in columns:
+        if {"pid", "payload_json", "payload_hash"}.issubset(columns):
             return
 
+        conn.execute("ALTER TABLE auth_codes RENAME TO auth_codes_legacy")
         conn.executescript(
             """
-            ALTER TABLE auth_codes RENAME TO auth_codes_legacy;
-
             CREATE TABLE auth_codes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 pid TEXT NOT NULL,
                 code TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                payload_hash TEXT NOT NULL,
                 source_batch TEXT,
                 status TEXT NOT NULL DEFAULT 'available',
                 assigned_mac TEXT,
@@ -87,25 +92,47 @@ class Database:
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
-
-            INSERT INTO auth_codes (
-                id, pid, code, source_batch, status, assigned_mac, assigned_at, created_at, updated_at
-            )
-            SELECT
-                id,
-                'default',
-                code,
-                source_batch,
-                status,
-                assigned_mac,
-                assigned_at,
-                created_at,
-                updated_at
-            FROM auth_codes_legacy;
-
-            DROP TABLE auth_codes_legacy;
             """
         )
+
+        legacy_columns = self._table_columns(conn, "auth_codes_legacy")
+        legacy_rows = conn.execute("SELECT * FROM auth_codes_legacy").fetchall()
+        for row in legacy_rows:
+            pid = row["pid"] if "pid" in legacy_columns else "default"
+            code = row["code"] if "code" in legacy_columns else ""
+            payload_json = (
+                row["payload_json"]
+                if "payload_json" in legacy_columns
+                else json.dumps({"auth_code": code}, ensure_ascii=False, sort_keys=True)
+            )
+            payload_hash = (
+                row["payload_hash"]
+                if "payload_hash" in legacy_columns
+                else hashlib.sha256(payload_json.encode("utf-8")).hexdigest()
+            )
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO auth_codes (
+                    id, pid, code, payload_json, payload_hash, source_batch,
+                    status, assigned_mac, assigned_at, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    row["id"],
+                    pid,
+                    code,
+                    payload_json,
+                    payload_hash,
+                    row["source_batch"] if "source_batch" in legacy_columns else None,
+                    row["status"] if "status" in legacy_columns else "available",
+                    row["assigned_mac"] if "assigned_mac" in legacy_columns else None,
+                    row["assigned_at"] if "assigned_at" in legacy_columns else None,
+                    row["created_at"] if "created_at" in legacy_columns else None,
+                    row["updated_at"] if "updated_at" in legacy_columns else None,
+                ),
+            )
+
+        conn.execute("DROP TABLE auth_codes_legacy")
 
     def _migrate_distribution_logs(self, conn: sqlite3.Connection) -> None:
         columns = self._table_columns(conn, "distribution_logs")

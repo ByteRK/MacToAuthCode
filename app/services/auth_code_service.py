@@ -40,7 +40,8 @@ class AuthCodeService:
                     "data": {
                         "pid": normalized_pid,
                         "mac": normalized_mac,
-                        "auth_code": existing["code"],
+                        "display_code": existing["code"],
+                        "payload": existing["payload"],
                         "assigned_at": existing["assigned_at"],
                         "source_batch": existing["source_batch"],
                         "mode": "reused",
@@ -82,7 +83,8 @@ class AuthCodeService:
                 "data": {
                     "pid": normalized_pid,
                     "mac": normalized_mac,
-                    "auth_code": assigned["code"],
+                    "display_code": assigned["code"],
+                    "payload": assigned["payload"],
                     "assigned_at": assigned["assigned_at"],
                     "source_batch": assigned["source_batch"],
                     "mode": "assigned",

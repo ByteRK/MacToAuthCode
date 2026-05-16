@@ -1,0 +1,9 @@
+{
+  "app_name": "授权码分发平台",
+  "host": "0.0.0.0",
+  "port": 8080,
+  "admin_username": "admin",
+  "admin_password": "ChangeMe123!",
+  "secret_key": "replace-with-a-random-string",
+  "data_dir": "data"
+}

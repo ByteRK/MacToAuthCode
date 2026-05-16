@@ -1,3 +1,4 @@
+import json
 from collections.abc import Iterable
 from typing import Any
 
@@ -11,19 +12,19 @@ class AuthCodeRepository:
     def find_assigned_by_mac(self, conn, pid: str, mac: str) -> dict[str, Any] | None:
         row = conn.execute(
             """
-            SELECT pid, code, assigned_mac, assigned_at, source_batch
+            SELECT pid, code, payload_json, assigned_mac, assigned_at, source_batch
             FROM auth_codes
             WHERE pid = ? AND assigned_mac = ?
             LIMIT 1
             """,
             (pid, mac),
         ).fetchone()
-        return dict(row) if row else None
+        return self._decode_row(row) if row else None
 
     def claim_next_available_code(self, conn, pid: str, mac: str) -> dict[str, Any] | None:
         row = conn.execute(
             """
-            SELECT id, pid, code, source_batch
+            SELECT id, pid, code, payload_json, source_batch
             FROM auth_codes
             WHERE pid = ? AND status = 'available'
             ORDER BY id ASC
@@ -50,13 +51,13 @@ class AuthCodeRepository:
 
         assigned = conn.execute(
             """
-            SELECT pid, code, assigned_mac, assigned_at, source_batch
+            SELECT pid, code, payload_json, assigned_mac, assigned_at, source_batch
             FROM auth_codes
             WHERE id = ?
             """,
             (row["id"],),
         ).fetchone()
-        return dict(assigned) if assigned else None
+        return self._decode_row(assigned) if assigned else None
 
     def log_distribution(
         self,
@@ -84,10 +85,16 @@ class AuthCodeRepository:
             for row in rows:
                 cursor = conn.execute(
                     """
-                    INSERT OR IGNORE INTO auth_codes (pid, code, source_batch)
-                    VALUES (?, ?, ?)
+                    INSERT OR IGNORE INTO auth_codes (pid, code, payload_json, payload_hash, source_batch)
+                    VALUES (?, ?, ?, ?, ?)
                     """,
-                    (row["pid"], row["code"], row.get("source_batch")),
+                    (
+                        row["pid"],
+                        row["code"],
+                        row["payload_json"],
+                        row["payload_hash"],
+                        row.get("source_batch"),
+                    ),
                 )
                 if cursor.rowcount == 1:
                     inserted += 1
@@ -144,23 +151,23 @@ class AuthCodeRepository:
                 SELECT COUNT(*)
                 FROM auth_codes
                 WHERE status = 'assigned'
-                  AND (pid LIKE ? OR assigned_mac LIKE ? OR code LIKE ?)
+                  AND (pid LIKE ? OR assigned_mac LIKE ? OR code LIKE ? OR payload_json LIKE ?)
                 """,
-                (keyword, keyword, keyword),
+                (keyword, keyword, keyword, keyword),
             ).fetchone()[0]
             rows = conn.execute(
                 """
-                SELECT pid, code, assigned_mac, assigned_at, source_batch
+                SELECT pid, code, payload_json, assigned_mac, assigned_at, source_batch
                 FROM auth_codes
                 WHERE status = 'assigned'
-                  AND (pid LIKE ? OR assigned_mac LIKE ? OR code LIKE ?)
+                  AND (pid LIKE ? OR assigned_mac LIKE ? OR code LIKE ? OR payload_json LIKE ?)
                 ORDER BY assigned_at DESC, id DESC
                 LIMIT ? OFFSET ?
                 """,
-                (keyword, keyword, keyword, page_size, offset),
+                (keyword, keyword, keyword, keyword, page_size, offset),
             ).fetchall()
         return {
-            "items": [dict(row) for row in rows],
+            "items": [self._decode_row(row) for row in rows],
             "total": total,
             "page": page,
             "page_size": page_size,
@@ -181,10 +188,10 @@ class AuthCodeRepository:
             params.append(status)
         if search:
             clauses.append(
-                "(pid LIKE ? OR code LIKE ? OR COALESCE(assigned_mac, '') LIKE ?)"
+                "(pid LIKE ? OR code LIKE ? OR COALESCE(assigned_mac, '') LIKE ? OR payload_json LIKE ?)"
             )
             keyword = f"%{search.strip()}%"
-            params.extend([keyword, keyword, keyword])
+            params.extend([keyword, keyword, keyword, keyword])
 
         where_sql = " AND ".join(clauses) if clauses else "1=1"
         offset = (page - 1) * page_size
@@ -195,7 +202,7 @@ class AuthCodeRepository:
             ).fetchone()[0]
             rows = conn.execute(
                 f"""
-                SELECT pid, code, source_batch, status, assigned_mac, assigned_at, created_at
+                SELECT pid, code, payload_json, source_batch, status, assigned_mac, assigned_at, created_at
                 FROM auth_codes
                 WHERE {where_sql}
                 ORDER BY id DESC
@@ -204,7 +211,7 @@ class AuthCodeRepository:
                 [*params, page_size, offset],
             ).fetchall()
         return {
-            "items": [dict(row) for row in rows],
+            "items": [self._decode_row(row) for row in rows],
             "total": total,
             "page": page,
             "page_size": page_size,
@@ -214,10 +221,18 @@ class AuthCodeRepository:
         with self.database.connection() as conn:
             rows = conn.execute(
                 """
-                SELECT pid, code, assigned_mac, assigned_at, source_batch, created_at
+                SELECT pid, code, payload_json, assigned_mac, assigned_at, source_batch, created_at
                 FROM auth_codes
                 WHERE status = 'assigned'
                 ORDER BY assigned_at DESC, id DESC
                 """
             ).fetchall()
-        return [dict(row) for row in rows]
+        return [self._decode_row(row) for row in rows]
+
+    @staticmethod
+    def _decode_row(row) -> dict[str, Any]:
+        item = dict(row)
+        payload = json.loads(item.get("payload_json") or "{}")
+        item["payload"] = payload
+        item["payload_preview"] = json.dumps(payload, ensure_ascii=False)
+        return item
