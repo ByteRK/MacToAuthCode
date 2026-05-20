@@ -1,0 +1,70 @@
+<section class="content-panel" id="inventory-panel">
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>库存概览</h2>
+        <p class="muted">默认按 PID 聚合展示库存，不直接堆满所有授权码明细。</p>
+      </div>
+      <form id="inventory-summary-form" class="inline-form">
+        <input id="inventory-summary-search" type="search" placeholder="搜索 PID">
+        <button type="submit" class="ghost-btn">查询</button>
+      </form>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>PID</th>
+            <th>总数</th>
+            <th>可分配</th>
+            <th>已分配</th>
+            <th>最近分配时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="inventory-summary-body"></tbody>
+      </table>
+    </div>
+    <div class="table-meta" id="inventory-summary-meta"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>授权码明细</h2>
+        <p class="muted" id="inventory-detail-hint">先从上方选择一个 PID，再查看对应的授权码明细。</p>
+      </div>
+      <form id="code-search-form" class="inline-form">
+        <input id="selected-pid" type="text" placeholder="点击上方“查看明细”自动填充" readonly>
+        <select id="code-status">
+          <option value="all">全部状态</option>
+          <option value="available">可分配</option>
+          <option value="assigned">已分配</option>
+        </select>
+        <input id="code-search" type="search" placeholder="搜索 MAC / 显示标识 / 载荷">
+        <button type="submit" class="ghost-btn">查询明细</button>
+      </form>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>PID</th>
+            <th>显示标识</th>
+            <th>状态</th>
+            <th>MAC</th>
+            <th>批次</th>
+            <th>载荷预览</th>
+            <th>分配时间</th>
+          </tr>
+        </thead>
+        <tbody id="codes-body">
+          <tr>
+            <td colspan="7">请选择 PID 后查看明细。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="table-meta" id="codes-meta"></div>
+  </div>
+</section>
