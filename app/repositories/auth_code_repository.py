@@ -176,6 +176,7 @@ class AuthCodeRepository:
     def list_codes(
         self,
         *,
+        pid: str = "",
         status: str = "all",
         search: str = "",
         page: int = 1,
@@ -183,6 +184,9 @@ class AuthCodeRepository:
     ) -> dict[str, Any]:
         clauses = []
         params: list[Any] = []
+        if pid:
+            clauses.append("pid = ?")
+            params.append(pid)
         if status in {"available", "assigned"}:
             clauses.append("status = ?")
             params.append(status)
@@ -212,6 +216,48 @@ class AuthCodeRepository:
             ).fetchall()
         return {
             "items": [self._decode_row(row) for row in rows],
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+        }
+
+    def summarize_inventory_by_pid(
+        self,
+        *,
+        search: str = "",
+        page: int = 1,
+        page_size: int = 20,
+    ) -> dict[str, Any]:
+        offset = (page - 1) * page_size
+        params: list[Any] = []
+        where_sql = "1=1"
+        if search:
+            where_sql = "pid LIKE ?"
+            params.append(f"%{search.strip()}%")
+
+        with self.database.connection() as conn:
+            total = conn.execute(
+                f"SELECT COUNT(DISTINCT pid) FROM auth_codes WHERE {where_sql}",
+                params,
+            ).fetchone()[0]
+            rows = conn.execute(
+                f"""
+                SELECT
+                    pid,
+                    COUNT(*) AS total_codes,
+                    SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) AS available_codes,
+                    SUM(CASE WHEN status = 'assigned' THEN 1 ELSE 0 END) AS assigned_codes,
+                    MAX(assigned_at) AS last_assigned_at
+                FROM auth_codes
+                WHERE {where_sql}
+                GROUP BY pid
+                ORDER BY pid ASC
+                LIMIT ? OFFSET ?
+                """,
+                [*params, page_size, offset],
+            ).fetchall()
+        return {
+            "items": [dict(row) for row in rows],
             "total": total,
             "page": page,
             "page_size": page_size,

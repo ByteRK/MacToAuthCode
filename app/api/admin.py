@@ -102,8 +102,33 @@ def codes():
     page_size = min(max(int(request.args.get("page_size", "20")), 1), 100)
     search = request.args.get("search", "").strip()
     status = request.args.get("status", "all").strip()
-    data = dashboard_service.get_codes(
-        status=status,
+    pid = request.args.get("pid", "").strip()
+    if pid:
+        data = dashboard_service.get_codes_by_pid(
+            pid=pid,
+            status=status,
+            search=search,
+            page=page,
+            page_size=page_size,
+        )
+    else:
+        data = dashboard_service.get_codes(
+            status=status,
+            search=search,
+            page=page,
+            page_size=page_size,
+        )
+    return jsonify({"success": True, "data": data})
+
+
+@admin_bp.get("/api/admin/inventory-summary")
+@admin_login_required
+def inventory_summary():
+    dashboard_service = current_app.extensions["dashboard_service"]
+    page = max(int(request.args.get("page", "1")), 1)
+    page_size = min(max(int(request.args.get("page_size", "20")), 1), 100)
+    search = request.args.get("search", "").strip()
+    data = dashboard_service.get_inventory_summary(
         search=search,
         page=page,
         page_size=page_size,

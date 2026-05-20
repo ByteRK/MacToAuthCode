@@ -22,7 +22,32 @@ class DashboardService:
 
     def get_codes(self, *, status: str, search: str, page: int, page_size: int) -> dict:
         return self.repository.list_codes(
+            pid="",
             status=status,
+            search=search,
+            page=page,
+            page_size=page_size,
+        )
+
+    def get_codes_by_pid(
+        self,
+        *,
+        pid: str,
+        status: str,
+        search: str,
+        page: int,
+        page_size: int,
+    ) -> dict:
+        return self.repository.list_codes(
+            pid=pid,
+            status=status,
+            search=search,
+            page=page,
+            page_size=page_size,
+        )
+
+    def get_inventory_summary(self, *, search: str, page: int, page_size: int) -> dict:
+        return self.repository.summarize_inventory_by_pid(
             search=search,
             page=page,
             page_size=page_size,

@@ -86,3 +86,38 @@ class PlatformTestCase(TestCase):
             codes = repo.list_codes(status="all", search="PX", page=1, page_size=10)
             self.assertEqual(len(codes["items"]), 2)
             self.assertEqual(codes["items"][0]["payload"]["license"][:4], "LIC-")
+
+    def test_inventory_summary_is_grouped_by_pid(self):
+        with TemporaryDirectory() as temp_dir:
+            app = self.create_test_app(temp_dir)
+            repo = app.extensions["auth_code_repository"]
+            repo.bulk_insert_codes(
+                [
+                    {
+                        "pid": "P1",
+                        "code": "P1-001",
+                        "payload_json": "{\"license\": \"P1-001\"}",
+                        "payload_hash": "summary-hash-p1-1",
+                        "source_batch": "B1",
+                    },
+                    {
+                        "pid": "P1",
+                        "code": "P1-002",
+                        "payload_json": "{\"license\": \"P1-002\"}",
+                        "payload_hash": "summary-hash-p1-2",
+                        "source_batch": "B1",
+                    },
+                    {
+                        "pid": "P2",
+                        "code": "P2-001",
+                        "payload_json": "{\"license\": \"P2-001\"}",
+                        "payload_hash": "summary-hash-p2-1",
+                        "source_batch": "B2",
+                    },
+                ]
+            )
+
+            summary = repo.summarize_inventory_by_pid(page=1, page_size=10)
+            self.assertEqual(summary["total"], 2)
+            self.assertEqual(summary["items"][0]["pid"], "P1")
+            self.assertEqual(summary["items"][0]["total_codes"], 2)
