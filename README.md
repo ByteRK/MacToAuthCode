@@ -134,7 +134,7 @@ chmod +x ./scripts/package.sh
 产物目录：
 
 ```text
-build-output/dist/AuthCodePlatform/
+dist/AuthCodePlatform/
 ```
 
 说明：

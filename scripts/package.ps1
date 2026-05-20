@@ -1,7 +1,8 @@
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $TempDir = Join-Path $ProjectRoot ".tmp"
-$BuildRoot = Join-Path $ProjectRoot "build-output"
-New-Item -ItemType Directory -Force $TempDir, $BuildRoot, (Join-Path $BuildRoot "dist"), (Join-Path $BuildRoot "build") | Out-Null
+$BuildRoot = Join-Path $ProjectRoot "build"
+$DistRoot = Join-Path $ProjectRoot "dist"
+New-Item -ItemType Directory -Force $TempDir, $BuildRoot, $DistRoot | Out-Null
 $env:TEMP = $TempDir
 $env:TMP = $TempDir
 
@@ -9,8 +10,8 @@ $env:TMP = $TempDir
   --noconfirm `
   --clean `
   --name AuthCodePlatform `
-  --distpath (Join-Path $BuildRoot "dist") `
-  --workpath (Join-Path $BuildRoot "build") `
+  --distpath $DistRoot `
+  --workpath $BuildRoot `
   --specpath $BuildRoot `
   --add-data "$ProjectRoot\app\templates;app\templates" `
   --add-data "$ProjectRoot\app\static;app\static" `

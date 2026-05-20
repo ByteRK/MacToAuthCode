@@ -6,8 +6,8 @@ __pycache__/
 *.pyo
 *.pyd
 .pytest_cache/
-build-output/
 dist/
+build/
 data/
 instance/
 *.spec
