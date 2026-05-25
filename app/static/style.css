@@ -12,7 +12,7 @@
   --accent-soft: #f6d3b8;
   --success: #2e7d5b;
   --shadow: 0 24px 60px rgba(66, 44, 31, 0.12);
-  --radius: 22px;
+  --radius: 14px;
 }
 
 * {
@@ -61,7 +61,7 @@ body {
   height: 64px;
   display: grid;
   place-items: center;
-  border-radius: 18px;
+  border-radius: 10px;
   color: #fff;
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -177,7 +177,7 @@ input[type="file"]::file-selector-button {
   font: inherit;
   font-weight: 700;
   border: 1px solid rgba(141, 63, 25, 0.16);
-  border-radius: 999px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 8px 18px rgba(66, 44, 31, 0.08);
   cursor: pointer;
@@ -191,7 +191,7 @@ input[type="file"]::-webkit-file-upload-button {
   font: inherit;
   font-weight: 700;
   border: 1px solid rgba(141, 63, 25, 0.16);
-  border-radius: 999px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 8px 18px rgba(66, 44, 31, 0.08);
   cursor: pointer;
@@ -212,7 +212,7 @@ a.ghost-btn {
   justify-content: center;
   gap: 8px;
   padding: 12px 18px;
-  border-radius: 999px;
+  border-radius: 10px;
   border: none;
   cursor: pointer;
   text-decoration: none;
@@ -239,7 +239,7 @@ a.ghost-btn:hover {
 
 .table-action {
   padding: 8px 12px;
-  border-radius: 999px;
+  border-radius: 10px;
 }
 
 .import-feedback {
@@ -418,7 +418,7 @@ a.ghost-btn:hover {
   min-width: 160px;
   padding: 10px 12px;
   border: 1px solid rgba(141, 63, 25, 0.1);
-  border-radius: 18px;
+  border-radius: 10px;
   background: rgba(255, 250, 244, 0.56);
 }
 
@@ -429,7 +429,7 @@ a.ghost-btn:hover {
 }
 
 .toolbar-field-medium {
-  min-width: 190px;
+  min-width: 250px;
 }
 
 .toolbar-field-wide {
@@ -508,7 +508,7 @@ th {
   font-size: 13px;
   padding: 10px 12px;
   border: 1px solid rgba(141, 63, 25, 0.1);
-  border-radius: 18px;
+  border-radius: 10px;
   background: rgba(255, 250, 244, 0.56);
 }
 
@@ -537,9 +537,9 @@ th {
   gap: 8px;
   color: var(--muted);
   font-size: 13px;
-  padding: 10px 12px;
+  padding: 20px 12px;
   border: 1px solid rgba(141, 63, 25, 0.1);
-  border-radius: 18px;
+  border-radius: 10px;
   background: rgba(255, 250, 244, 0.56);
 }
 
@@ -583,7 +583,7 @@ th {
   display: inline-flex;
   align-items: center;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: 10px;
   font-size: 12px;
   background: var(--accent-soft);
 }
