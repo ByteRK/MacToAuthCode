@@ -3,6 +3,22 @@ import { renderRows, renderTableMeta, byId } from "../core/dom.js";
 import { state } from "../core/state.js";
 import { switchPanel } from "./navigation.js";
 
+function renderCodePagination(result) {
+  const totalPages = Math.max(1, Math.ceil(result.total / result.page_size));
+  state.codeDetails.totalPages = totalPages;
+  byId("codes-page-indicator").textContent = `第 ${result.page} / ${totalPages} 页`;
+  byId("codes-prev-page").disabled = result.page <= 1;
+  byId("codes-next-page").disabled = result.page >= totalPages;
+}
+
+function resetCodeDetailsView() {
+  byId("codes-body").innerHTML = '<tr><td colspan="7">请选择 PID 后查看明细。</td></tr>';
+  byId("codes-meta").textContent = "";
+  byId("codes-page-indicator").textContent = "第 1 / 1 页";
+  byId("codes-prev-page").disabled = true;
+  byId("codes-next-page").disabled = true;
+}
+
 export async function loadInventorySummary() {
   const { page, pageSize, search } = state.inventorySummary;
   const payload = await fetchJson(
@@ -26,8 +42,7 @@ export async function loadInventorySummary() {
 
 export async function loadCodeDetails() {
   if (!state.selectedPid) {
-    byId("codes-body").innerHTML = '<tr><td colspan="7">请选择 PID 后查看明细。</td></tr>';
-    byId("codes-meta").textContent = "";
+    resetCodeDetailsView();
     return;
   }
 
@@ -50,6 +65,7 @@ export async function loadCodeDetails() {
     "当前筛选条件下暂无明细"
   );
   renderTableMeta("codes-meta", payload.data, `PID ${state.selectedPid} 明细`);
+  renderCodePagination(payload.data);
 }
 
 export function selectPid(pid) {
@@ -82,8 +98,30 @@ export function bindInventory() {
     if (!(target instanceof HTMLElement)) {
       return;
     }
-    if (target.classList.contains("table-action")) {
+    if (target.classList.contains("payload-action")) {
+      return;
+    }
+    if (target.classList.contains("table-action") && target.dataset.pid) {
       selectPid(target.dataset.pid || "");
     }
   });
+
+  byId("codes-prev-page").addEventListener("click", async () => {
+    if (!state.selectedPid || state.codeDetails.page <= 1) {
+      return;
+    }
+    state.codeDetails.page -= 1;
+    await loadCodeDetails();
+  });
+
+  byId("codes-next-page").addEventListener("click", async () => {
+    const totalPages = state.codeDetails.totalPages || 1;
+    if (!state.selectedPid || state.codeDetails.page >= totalPages) {
+      return;
+    }
+    state.codeDetails.page += 1;
+    await loadCodeDetails();
+  });
+
+  resetCodeDetailsView();
 }

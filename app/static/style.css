@@ -348,6 +348,26 @@ th {
   font-size: 13px;
 }
 
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.pagination-info {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .status-chip {
   display: inline-flex;
   align-items: center;
