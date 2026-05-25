@@ -1,6 +1,6 @@
 # 授权码分发平台
 
-一个面向 Windows / Linux 局域网环境的授权码分发平台，适合产线或测试环境部署。
+一个面向 Windows / Linux / macOS 局域网环境的授权码分发平台，适合产线或测试环境部署。
 
 ## 功能
 
@@ -44,6 +44,13 @@ python3 -m venv .venv
 python -m pip --python ./.venv/bin/python install -r requirements.txt
 ```
 
+macOS:
+
+```bash
+uv venv .venv
+uv pip install --python ./.venv/bin/python -r requirements.txt
+```
+
 ### 2. 修改配置
 
 编辑 `config.json`：
@@ -63,12 +70,17 @@ Windows:
 .\scripts\run_dev.ps1
 ```
 
-Linux:
+Linux / macOS:
 
 ```bash
 chmod +x ./scripts/run_dev.sh
 ./scripts/run_dev.sh
 ```
+
+说明：
+
+- macOS 下 `run_dev.sh` 会优先使用 `uv` 管理 `.venv`；如果 `.venv` 不存在，会自动创建并安装依赖。
+- Linux 下仍沿用现有 `.venv` 方式，脚本不会主动改动环境。
 
 启动后访问：
 
@@ -128,7 +140,7 @@ Windows:
 .\scripts\package.ps1
 ```
 
-Linux:
+Linux / macOS:
 
 ```bash
 chmod +x ./scripts/package.sh
@@ -143,7 +155,8 @@ dist/AuthCodePlatform/
 
 说明：
 
-- Windows 和 Linux 需要分别在对应系统上执行打包。
+- Windows、Linux、macOS 需要分别在对应系统上执行打包。
+- macOS 下 `package.sh` 会优先使用 `uv` 管理 `.venv`；如果缺少 `pyinstaller`，脚本会自动安装依赖。
 - `config.json`、`data/` 可和打包产物放在同级目录，便于现场修改配置和持久化数据。
 - 如果现场启用了 Windows App Control、Defender Application Control 或其它白名单策略，未签名的 `AuthCodePlatform.exe` 可能需要预先放行或做代码签名。
 
