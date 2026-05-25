@@ -2,35 +2,16 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VENV_PYTHON="${PROJECT_ROOT}/.venv/bin/python"
-
-ensure_macos_runtime() {
-  if ! command -v uv >/dev/null 2>&1; then
-    echo "macOS 环境需要先安装 uv，才能自动管理 .venv。" >&2
-    exit 1
-  fi
-
-  if [ ! -x "${VENV_PYTHON}" ]; then
-    uv venv "${PROJECT_ROOT}/.venv"
-    uv pip install --python "${VENV_PYTHON}" -r "${PROJECT_ROOT}/requirements.txt"
-  fi
-}
 
 case "$(uname -s)" in
   Darwin)
-    ensure_macos_runtime
+    exec "${PROJECT_ROOT}/scripts/run_dev_mac.sh"
     ;;
   Linux)
-    if [ ! -x "${VENV_PYTHON}" ]; then
-      echo "未找到 ${VENV_PYTHON}，请先创建 .venv 并安装依赖。" >&2
-      exit 1
-    fi
+    exec "${PROJECT_ROOT}/scripts/run_dev_linux.sh"
     ;;
   *)
-    echo "当前脚本仅支持 Linux / macOS，请在 Windows 上使用 scripts/run_dev.ps1。" >&2
+    echo "当前脚本仅支持 Linux / macOS，请按系统使用 scripts/run_dev_win.ps1、scripts/run_dev_linux.sh 或 scripts/run_dev_mac.sh。" >&2
     exit 1
     ;;
 esac
-
-export AUTH_PLATFORM_DATA_DIR="${PROJECT_ROOT}/data"
-exec "${VENV_PYTHON}" "${PROJECT_ROOT}/main.py"

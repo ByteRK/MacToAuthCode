@@ -26,6 +26,13 @@ config.json       # 运行配置
 main.py           # Waitress 服务入口
 ```
 
+脚本建议直接按系统使用：
+
+- Windows：`scripts/run_dev_win.ps1`、`scripts/package_win.ps1`
+- Linux：`scripts/run_dev_linux.sh`、`scripts/package_linux.sh`
+- macOS：`scripts/run_dev_mac.sh`、`scripts/package_mac.sh`
+- 兼容入口：`scripts/run_dev.ps1`、`scripts/run_dev.sh`、`scripts/package.ps1`、`scripts/package.sh`
+
 ## 本地运行
 
 ### 1. 创建并使用 venv
@@ -67,20 +74,28 @@ uv pip install --python ./.venv/bin/python -r requirements.txt
 Windows:
 
 ```powershell
-.\scripts\run_dev.ps1
+.\scripts\run_dev_win.ps1
 ```
 
-Linux / macOS:
+Linux:
 
 ```bash
-chmod +x ./scripts/run_dev.sh
-./scripts/run_dev.sh
+chmod +x ./scripts/run_dev_linux.sh
+./scripts/run_dev_linux.sh
+```
+
+macOS:
+
+```bash
+chmod +x ./scripts/run_dev_mac.sh
+./scripts/run_dev_mac.sh
 ```
 
 说明：
 
-- macOS 下 `run_dev.sh` 会优先使用 `uv` 管理 `.venv`；如果 `.venv` 不存在，会自动创建并安装依赖。
+- macOS 下 `run_dev_mac.sh` 会优先使用 `uv` 管理 `.venv`；如果 `.venv` 不存在，会自动创建并安装依赖。
 - Linux 下仍沿用现有 `.venv` 方式，脚本不会主动改动环境。
+- 如果你仍在使用旧入口 `scripts/run_dev.sh` / `scripts/run_dev.ps1`，它们现在会转发到对应系统脚本。
 
 启动后访问：
 
@@ -137,14 +152,21 @@ chmod +x ./scripts/run_dev.sh
 Windows:
 
 ```powershell
-.\scripts\package.ps1
+.\scripts\package_win.ps1
 ```
 
-Linux / macOS:
+Linux:
 
 ```bash
-chmod +x ./scripts/package.sh
-./scripts/package.sh
+chmod +x ./scripts/package_linux.sh
+./scripts/package_linux.sh
+```
+
+macOS:
+
+```bash
+chmod +x ./scripts/package_mac.sh
+./scripts/package_mac.sh
 ```
 
 产物目录：
@@ -156,9 +178,10 @@ dist/AuthCodePlatform/
 说明：
 
 - Windows、Linux、macOS 需要分别在对应系统上执行打包。
-- macOS 下 `package.sh` 会优先使用 `uv` 管理 `.venv`；如果缺少 `pyinstaller`，脚本会自动安装依赖。
+- macOS 下 `package_mac.sh` 会优先使用 `uv` 管理 `.venv`；如果缺少 `pyinstaller`，脚本会自动安装依赖。
 - `config.json`、`data/` 可和打包产物放在同级目录，便于现场修改配置和持久化数据。
 - 如果现场启用了 Windows App Control、Defender Application Control 或其它白名单策略，未签名的 `AuthCodePlatform.exe` 可能需要预先放行或做代码签名。
+- 如果你仍在使用旧入口 `scripts/package.sh` / `scripts/package.ps1`，它们现在会转发到对应系统脚本。
 
 ## 测试
 
