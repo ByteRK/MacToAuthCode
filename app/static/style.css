@@ -140,6 +140,33 @@ a.ghost-btn:hover {
   border-radius: 999px;
 }
 
+.import-feedback {
+  margin-top: 14px;
+}
+
+.import-error-box {
+  margin-top: 14px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(163, 49, 49, 0.18);
+  background: rgba(221, 115, 115, 0.12);
+}
+
+.import-error-title {
+  font-weight: 700;
+  color: #8f2929;
+}
+
+.import-error-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: #7c3535;
+}
+
+.import-error-list li + li {
+  margin-top: 6px;
+}
+
 .hidden {
   display: none !important;
 }

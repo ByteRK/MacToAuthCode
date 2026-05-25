@@ -85,12 +85,40 @@ class PlatformTestCase(TestCase):
             workbook.save(buffer)
             buffer.seek(0)
 
-            with self.assertRaisesRegex(ValueError, "第 3 行") as ctx:
+            with self.assertRaises(Exception) as ctx:
                 excel_service.import_codes(buffer, default_pid="PX")
-            self.assertIn("第 4 行", str(ctx.exception))
+            self.assertIn("第 3 行", ctx.exception.errors[0])
+            self.assertIn("第 4 行", ctx.exception.errors[1])
 
             codes = repo.list_codes(status="all", search="PX", page=1, page_size=10)
             self.assertEqual(codes["total"], 0)
+
+    def test_admin_import_api_returns_structured_errors(self):
+        with TemporaryDirectory() as temp_dir:
+            app = self.create_test_app(temp_dir)
+            client = app.test_client()
+            client.post("/login", data={"username": "admin", "password": "password"})
+
+            workbook = Workbook()
+            sheet = workbook.active
+            sheet.append(["pid", "did", "license"])
+            sheet.append(["PX", "", "LIC-001"])
+            buffer = BytesIO()
+            workbook.save(buffer)
+            buffer.seek(0)
+
+            response = client.post(
+                "/api/admin/import-codes",
+                data={"file": (buffer, "invalid.xlsx")},
+                content_type="multipart/form-data",
+            )
+            payload = response.get_json()
+
+            self.assertEqual(response.status_code, 400)
+            self.assertFalse(payload["success"])
+            self.assertIn("导入校验失败", payload["message"])
+            self.assertTrue(payload["errors"])
+            self.assertIn("第 2 行", payload["errors"][0])
 
     def test_excel_import_supports_same_did_under_different_pid(self):
         with TemporaryDirectory() as temp_dir:

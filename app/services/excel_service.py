@@ -8,6 +8,12 @@ from openpyxl import Workbook, load_workbook
 from app.repositories.auth_code_repository import AuthCodeRepository
 
 
+class ImportValidationError(ValueError):
+    def __init__(self, message: str, errors: list[str]) -> None:
+        super().__init__(message)
+        self.errors = errors
+
+
 REQUIRED_PAYLOAD_FIELDS = ("did", "license")
 HEADER_PID_CANDIDATES = {"pid", "product_pid", "产品pid", "产品id"}
 HEADER_BATCH_CANDIDATES = {"batch", "source_batch", "批次"}
@@ -97,7 +103,7 @@ class ExcelService:
             if parsed:
                 parsed_rows.append(parsed)
         if errors:
-            raise ValueError("导入校验失败，请先修正以下问题后再重试：\n" + "\n".join(errors))
+            raise ImportValidationError("导入校验失败，请先修正以下问题后再重试", errors)
         return parsed_rows
 
     @staticmethod

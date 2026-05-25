@@ -12,6 +12,8 @@ from flask import (
     url_for,
 )
 
+from app.services.excel_service import ImportValidationError
+
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -147,6 +149,14 @@ def import_codes():
     excel_service = current_app.extensions["excel_service"]
     try:
         result = excel_service.import_codes(upload.stream, default_pid=default_pid)
+    except ImportValidationError as exc:
+        return jsonify(
+            {
+                "success": False,
+                "message": str(exc),
+                "errors": exc.errors,
+            }
+        ), 400
     except ValueError as exc:
         return jsonify({"success": False, "message": str(exc)}), 400
 

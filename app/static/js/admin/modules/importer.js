@@ -1,12 +1,26 @@
 import { fetchJson } from "../core/api.js";
 import { byId } from "../core/dom.js";
 
+function renderImportErrors(errors) {
+  const container = byId("import-errors");
+  const list = byId("import-errors-list");
+  if (!errors.length) {
+    container.classList.add("hidden");
+    list.innerHTML = "";
+    return;
+  }
+
+  list.innerHTML = errors.map((item) => `<li>${item}</li>`).join("");
+  container.classList.remove("hidden");
+}
+
 export function bindImporter({ refreshOverview, refreshAllocations, refreshInventory, refreshCodeDetails }) {
   byId("import-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
     const formData = new FormData(form);
     const resultNode = byId("import-result");
+    renderImportErrors([]);
     resultNode.textContent = "正在导入，请稍候...";
 
     try {
@@ -30,6 +44,7 @@ export function bindImporter({ refreshOverview, refreshAllocations, refreshInven
       ]);
     } catch (error) {
       resultNode.textContent = error.message;
+      renderImportErrors(error.details || []);
     }
   });
 }
