@@ -6,7 +6,10 @@
         <p class="muted">按 PID 聚合展示库存。</p>
       </div>
       <form id="inventory-summary-form" class="inline-form">
-        <input id="inventory-summary-search" type="search" placeholder="搜索 PID">
+        <label class="toolbar-field toolbar-field-wide">
+          <span>关键词</span>
+          <input id="inventory-summary-search" type="search" placeholder="搜索 PID">
+        </label>
         <button type="submit" class="ghost-btn">查询</button>
       </form>
     </div>
@@ -53,13 +56,22 @@
         <p class="muted" id="inventory-detail-hint">先从上方选择一个 PID，再查看对应的授权码明细。</p>
       </div>
       <form id="code-search-form" class="inline-form">
-        <input id="selected-pid" type="text" placeholder="点击上方“查看明细”自动填充" readonly>
-        <select id="code-status">
-          <option value="all">全部状态</option>
-          <option value="available">可分配</option>
-          <option value="assigned">已分配</option>
-        </select>
-        <input id="code-search" type="search" placeholder="搜索 MAC / DID / 载荷">
+        <label class="toolbar-field toolbar-field-medium">
+          <span>当前 PID</span>
+          <input id="selected-pid" type="text" placeholder="点击上方“查看明细”自动填充" readonly>
+        </label>
+        <label class="toolbar-field">
+          <span>状态</span>
+          <select id="code-status">
+            <option value="all">全部状态</option>
+            <option value="available">可分配</option>
+            <option value="assigned">已分配</option>
+          </select>
+        </label>
+        <label class="toolbar-field toolbar-field-wide">
+          <span>关键词</span>
+          <input id="code-search" type="search" placeholder="搜索 MAC / DID / 载荷">
+        </label>
         <button type="submit" class="ghost-btn">查询明细</button>
       </form>
     </div>

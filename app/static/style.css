@@ -138,6 +138,8 @@ select:focus {
 }
 
 select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
   appearance: none;
   padding-right: 40px;
   background-image:
@@ -150,6 +152,13 @@ select {
 
 input[type="datetime-local"] {
   min-width: 188px;
+}
+
+input[readonly] {
+  color: var(--muted);
+  border-style: dashed;
+  background:
+    linear-gradient(180deg, rgba(252, 247, 242, 0.96), rgba(243, 232, 220, 0.9));
 }
 
 input[type="file"] {
@@ -395,11 +404,36 @@ a.ghost-btn:hover {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  align-items: flex-end;
 }
 
 .inline-form input,
 .inline-form select {
   min-width: 200px;
+}
+
+.toolbar-field {
+  display: grid;
+  gap: 8px;
+  min-width: 160px;
+  padding: 10px 12px;
+  border: 1px solid rgba(141, 63, 25, 0.1);
+  border-radius: 18px;
+  background: rgba(255, 250, 244, 0.56);
+}
+
+.toolbar-field input,
+.toolbar-field select {
+  min-width: 0;
+  width: 100%;
+}
+
+.toolbar-field-medium {
+  min-width: 190px;
+}
+
+.toolbar-field-wide {
+  min-width: 240px;
 }
 
 .import-form {
