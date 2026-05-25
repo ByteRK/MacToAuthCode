@@ -93,7 +93,7 @@ chmod +x ./scripts/run_dev.sh
   "data": {
     "pid": "P1001",
     "mac": "AA:BB:CC:11:22:33",
-    "display_code": "LICENSE-001",
+    "display_code": "DID-001",
     "payload": {
       "did": "DID-001",
       "license": "LICENSE-001"
@@ -109,10 +109,11 @@ chmod +x ./scripts/run_dev.sh
 
 - 默认读取首个工作表。
 - 推荐表头：`pid`、`did`、`license`、`source_batch`
+- `did` 和 `license` 为必填字段，缺少任意一个都会直接报错。
 - 除 `pid` 和 `source_batch` 之外，其它列都会作为结构化 JSON 载荷保存。
-- 后台会自动从 `auth_code / license / did / code` 中挑一个值作为显示标识。
+- 后台默认使用 `did` 作为显示标识，避免长 `license` 直接挤占表格空间。
 - 如果文件里没有 `pid` 列，可在后台导入时填写“默认 PID”。
-- 重复的相同结构化载荷会被自动跳过，不会重复入库。
+- 导入时会对 `did` 进行查重：同一文件内重复或库存中已存在的 `did` 都会被跳过，并在后台给出告警。
 
 ## 打包交付
 

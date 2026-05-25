@@ -12,7 +12,7 @@ class AuthCodeRepository:
     def find_assigned_by_mac(self, conn, pid: str, mac: str) -> dict[str, Any] | None:
         row = conn.execute(
             """
-            SELECT pid, code, payload_json, assigned_mac, assigned_at, source_batch
+            SELECT pid, did, license, code, payload_json, assigned_mac, assigned_at, source_batch
             FROM auth_codes
             WHERE pid = ? AND assigned_mac = ?
             LIMIT 1
@@ -24,7 +24,7 @@ class AuthCodeRepository:
     def claim_next_available_code(self, conn, pid: str, mac: str) -> dict[str, Any] | None:
         row = conn.execute(
             """
-            SELECT id, pid, code, payload_json, source_batch
+            SELECT id, pid, did, license, code, payload_json, source_batch
             FROM auth_codes
             WHERE pid = ? AND status = 'available'
             ORDER BY id ASC
@@ -51,7 +51,7 @@ class AuthCodeRepository:
 
         assigned = conn.execute(
             """
-            SELECT pid, code, payload_json, assigned_mac, assigned_at, source_batch
+            SELECT pid, did, license, code, payload_json, assigned_mac, assigned_at, source_batch
             FROM auth_codes
             WHERE id = ?
             """,
@@ -69,27 +69,61 @@ class AuthCodeRepository:
         message: str,
         client_ip: str | None,
         code: str | None = None,
+        payload_json: str | None = None,
     ) -> None:
         conn.execute(
             """
-            INSERT INTO distribution_logs (pid, mac, code, action, message, client_ip)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO distribution_logs (pid, mac, code, payload_json, action, message, client_ip)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (pid, mac, code, action, message, client_ip),
+            (pid, mac, code, payload_json, action, message, client_ip),
         )
 
     def bulk_insert_codes(self, rows: Iterable[dict[str, str]]) -> dict[str, int]:
         inserted = 0
         skipped = 0
+        warnings: list[str] = []
+        duplicate_dids: list[str] = []
+        row_list = list(rows)
+        if not row_list:
+            return {"inserted": 0, "skipped": 0, "warnings": []}
+
+        file_duplicate_dids = self._collect_duplicate_dids(row_list)
+        if file_duplicate_dids:
+            duplicate_dids.extend(sorted(file_duplicate_dids))
+            warnings.append(
+                f"以下 DID 在本次导入文件中重复，已跳过重复记录：{', '.join(sorted(file_duplicate_dids))}"
+            )
+
         with self.database.connection() as conn:
-            for row in rows:
+            existing_dids = self.find_existing_dids(
+                conn,
+                [row["did"] for row in row_list if row.get("did")],
+            )
+            if existing_dids:
+                duplicate_dids.extend(sorted(existing_dids))
+                warnings.append(
+                    f"以下 DID 已存在库存中，导入时已跳过：{', '.join(sorted(existing_dids))}"
+                )
+
+            seen_dids: set[str] = set()
+            for row in row_list:
+                did = row["did"]
+                if did in existing_dids or did in seen_dids:
+                    skipped += 1
+                    continue
+                seen_dids.add(did)
                 cursor = conn.execute(
                     """
-                    INSERT OR IGNORE INTO auth_codes (pid, code, payload_json, payload_hash, source_batch)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT OR IGNORE INTO auth_codes (
+                        pid, did, license, code, payload_json, payload_hash, source_batch
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         row["pid"],
+                        row["did"],
+                        row["license"],
                         row["code"],
                         row["payload_json"],
                         row["payload_hash"],
@@ -100,7 +134,12 @@ class AuthCodeRepository:
                     inserted += 1
                 else:
                     skipped += 1
-        return {"inserted": inserted, "skipped": skipped}
+        return {
+            "inserted": inserted,
+            "skipped": skipped,
+            "duplicate_dids": sorted(set(duplicate_dids)),
+            "warnings": warnings,
+        }
 
     def fetch_summary(self) -> dict[str, int]:
         with self.database.connection() as conn:
@@ -127,14 +166,14 @@ class AuthCodeRepository:
         with self.database.connection() as conn:
             rows = conn.execute(
                 """
-                SELECT pid, mac, code, action, message, client_ip, created_at
+                SELECT pid, mac, code, payload_json, action, message, client_ip, created_at
                 FROM distribution_logs
                 ORDER BY id DESC
                 LIMIT ?
                 """,
                 (limit,),
             ).fetchall()
-        return [dict(row) for row in rows]
+        return [self._decode_log_row(row) for row in rows]
 
     def list_allocations(
         self,
@@ -151,20 +190,24 @@ class AuthCodeRepository:
                 SELECT COUNT(*)
                 FROM auth_codes
                 WHERE status = 'assigned'
-                  AND (pid LIKE ? OR assigned_mac LIKE ? OR code LIKE ? OR payload_json LIKE ?)
+                  AND (
+                    pid LIKE ? OR assigned_mac LIKE ? OR did LIKE ? OR code LIKE ? OR payload_json LIKE ?
+                  )
                 """,
-                (keyword, keyword, keyword, keyword),
+                (keyword, keyword, keyword, keyword, keyword),
             ).fetchone()[0]
             rows = conn.execute(
                 """
-                SELECT pid, code, payload_json, assigned_mac, assigned_at, source_batch
+                SELECT pid, did, license, code, payload_json, assigned_mac, assigned_at, source_batch
                 FROM auth_codes
                 WHERE status = 'assigned'
-                  AND (pid LIKE ? OR assigned_mac LIKE ? OR code LIKE ? OR payload_json LIKE ?)
+                  AND (
+                    pid LIKE ? OR assigned_mac LIKE ? OR did LIKE ? OR code LIKE ? OR payload_json LIKE ?
+                  )
                 ORDER BY assigned_at DESC, id DESC
                 LIMIT ? OFFSET ?
                 """,
-                (keyword, keyword, keyword, keyword, page_size, offset),
+                (keyword, keyword, keyword, keyword, keyword, page_size, offset),
             ).fetchall()
         return {
             "items": [self._decode_row(row) for row in rows],
@@ -192,10 +235,13 @@ class AuthCodeRepository:
             params.append(status)
         if search:
             clauses.append(
-                "(pid LIKE ? OR code LIKE ? OR COALESCE(assigned_mac, '') LIKE ? OR payload_json LIKE ?)"
+                """
+                (pid LIKE ? OR did LIKE ? OR code LIKE ?
+                 OR COALESCE(assigned_mac, '') LIKE ? OR payload_json LIKE ?)
+                """
             )
             keyword = f"%{search.strip()}%"
-            params.extend([keyword, keyword, keyword, keyword])
+            params.extend([keyword, keyword, keyword, keyword, keyword])
 
         where_sql = " AND ".join(clauses) if clauses else "1=1"
         offset = (page - 1) * page_size
@@ -206,7 +252,9 @@ class AuthCodeRepository:
             ).fetchone()[0]
             rows = conn.execute(
                 f"""
-                SELECT pid, code, payload_json, source_batch, status, assigned_mac, assigned_at, created_at
+                SELECT
+                    pid, did, license, code, payload_json, source_batch,
+                    status, assigned_mac, assigned_at, created_at
                 FROM auth_codes
                 WHERE {where_sql}
                 ORDER BY id DESC
@@ -247,6 +295,7 @@ class AuthCodeRepository:
                     COUNT(*) AS total_codes,
                     SUM(CASE WHEN status = 'available' THEN 1 ELSE 0 END) AS available_codes,
                     SUM(CASE WHEN status = 'assigned' THEN 1 ELSE 0 END) AS assigned_codes,
+                    MIN(did) AS sample_did,
                     MAX(assigned_at) AS last_assigned_at
                 FROM auth_codes
                 WHERE {where_sql}
@@ -267,7 +316,7 @@ class AuthCodeRepository:
         with self.database.connection() as conn:
             rows = conn.execute(
                 """
-                SELECT pid, code, payload_json, assigned_mac, assigned_at, source_batch, created_at
+                SELECT pid, did, license, code, payload_json, assigned_mac, assigned_at, source_batch, created_at
                 FROM auth_codes
                 WHERE status = 'assigned'
                 ORDER BY assigned_at DESC, id DESC
@@ -276,9 +325,46 @@ class AuthCodeRepository:
         return [self._decode_row(row) for row in rows]
 
     @staticmethod
+    def _collect_duplicate_dids(rows: list[dict[str, str]]) -> set[str]:
+        seen: set[str] = set()
+        duplicates: set[str] = set()
+        for row in rows:
+            did = row.get("did", "").strip()
+            if not did:
+                continue
+            if did in seen:
+                duplicates.add(did)
+            seen.add(did)
+        return duplicates
+
+    @staticmethod
+    def find_existing_dids(conn, dids: list[str]) -> set[str]:
+        normalized = sorted({did.strip() for did in dids if did.strip()})
+        if not normalized:
+            return set()
+        placeholders = ", ".join("?" for _ in normalized)
+        rows = conn.execute(
+            f"SELECT did FROM auth_codes WHERE did IN ({placeholders})",
+            normalized,
+        ).fetchall()
+        return {row["did"] for row in rows}
+
+    @staticmethod
     def _decode_row(row) -> dict[str, Any]:
         item = dict(row)
         payload = json.loads(item.get("payload_json") or "{}")
         item["payload"] = payload
-        item["payload_preview"] = json.dumps(payload, ensure_ascii=False)
+        item["payload_preview"] = json.dumps(payload, ensure_ascii=False, indent=2)
+        item["display_code"] = item.get("did") or item.get("code")
+        return item
+
+    @staticmethod
+    def _decode_log_row(row) -> dict[str, Any]:
+        item = dict(row)
+        payload_json = item.get("payload_json")
+        payload = json.loads(payload_json) if payload_json else None
+        item["payload"] = payload
+        item["payload_preview"] = (
+            json.dumps(payload, ensure_ascii=False, indent=2) if payload is not None else ""
+        )
         return item

@@ -10,6 +10,8 @@ SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS auth_codes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     pid TEXT NOT NULL,
+    did TEXT NOT NULL,
+    license TEXT NOT NULL,
     code TEXT NOT NULL,
     payload_json TEXT NOT NULL,
     payload_hash TEXT NOT NULL,
@@ -26,6 +28,7 @@ CREATE TABLE IF NOT EXISTS distribution_logs (
     pid TEXT NOT NULL,
     mac TEXT NOT NULL,
     code TEXT,
+    payload_json TEXT,
     action TEXT NOT NULL,
     message TEXT,
     client_ip TEXT,
@@ -33,6 +36,8 @@ CREATE TABLE IF NOT EXISTS distribution_logs (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_codes_pid_payload_hash ON auth_codes(pid, payload_hash);
+CREATE INDEX IF NOT EXISTS idx_auth_codes_did ON auth_codes(did);
+CREATE INDEX IF NOT EXISTS idx_auth_codes_pid_did ON auth_codes(pid, did);
 CREATE INDEX IF NOT EXISTS idx_auth_codes_pid_status ON auth_codes(pid, status);
 CREATE INDEX IF NOT EXISTS idx_auth_codes_pid_assigned_mac ON auth_codes(pid, assigned_mac);
 CREATE INDEX IF NOT EXISTS idx_distribution_logs_pid_mac ON distribution_logs(pid, mac);
@@ -73,7 +78,7 @@ class Database:
         columns = self._table_columns(conn, "auth_codes")
         if not columns:
             return
-        if {"pid", "payload_json", "payload_hash"}.issubset(columns):
+        if {"pid", "did", "license", "payload_json", "payload_hash"}.issubset(columns):
             return
 
         conn.execute("ALTER TABLE auth_codes RENAME TO auth_codes_legacy")
@@ -82,6 +87,8 @@ class Database:
             CREATE TABLE auth_codes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 pid TEXT NOT NULL,
+                did TEXT NOT NULL,
+                license TEXT NOT NULL,
                 code TEXT NOT NULL,
                 payload_json TEXT NOT NULL,
                 payload_hash TEXT NOT NULL,
@@ -105,6 +112,17 @@ class Database:
                 if "payload_json" in legacy_columns
                 else json.dumps({"auth_code": code}, ensure_ascii=False, sort_keys=True)
             )
+            payload = json.loads(payload_json or "{}")
+            did = (
+                row["did"]
+                if "did" in legacy_columns and row["did"]
+                else self._extract_payload_value(payload, "did") or code
+            )
+            license_value = (
+                row["license"]
+                if "license" in legacy_columns and row["license"]
+                else self._extract_payload_value(payload, "license") or code
+            )
             payload_hash = (
                 row["payload_hash"]
                 if "payload_hash" in legacy_columns
@@ -113,13 +131,15 @@ class Database:
             conn.execute(
                 """
                 INSERT OR IGNORE INTO auth_codes (
-                    id, pid, code, payload_json, payload_hash, source_batch,
+                    id, pid, did, license, code, payload_json, payload_hash, source_batch,
                     status, assigned_mac, assigned_at, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     row["id"],
                     pid,
+                    did,
+                    license_value,
                     code,
                     payload_json,
                     payload_hash,
@@ -138,38 +158,54 @@ class Database:
         columns = self._table_columns(conn, "distribution_logs")
         if not columns:
             return
-        if "pid" in columns:
+        if {"pid", "payload_json"}.issubset(columns):
             return
 
+        conn.execute("ALTER TABLE distribution_logs RENAME TO distribution_logs_legacy")
         conn.executescript(
             """
-            ALTER TABLE distribution_logs RENAME TO distribution_logs_legacy;
-
             CREATE TABLE distribution_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 pid TEXT NOT NULL,
                 mac TEXT NOT NULL,
                 code TEXT,
+                payload_json TEXT,
                 action TEXT NOT NULL,
                 message TEXT,
                 client_ip TEXT,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
-
-            INSERT INTO distribution_logs (
-                id, pid, mac, code, action, message, client_ip, created_at
-            )
-            SELECT
-                id,
-                'default',
-                mac,
-                code,
-                action,
-                message,
-                client_ip,
-                created_at
-            FROM distribution_logs_legacy;
-
-            DROP TABLE distribution_logs_legacy;
             """
         )
+        legacy_columns = self._table_columns(conn, "distribution_logs_legacy")
+        legacy_rows = conn.execute("SELECT * FROM distribution_logs_legacy").fetchall()
+        for row in legacy_rows:
+            conn.execute(
+                """
+                INSERT INTO distribution_logs (
+                    id, pid, mac, code, payload_json, action, message, client_ip, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    row["id"],
+                    row["pid"] if "pid" in legacy_columns else "default",
+                    row["mac"],
+                    row["code"] if "code" in legacy_columns else None,
+                    row["payload_json"] if "payload_json" in legacy_columns else None,
+                    row["action"],
+                    row["message"] if "message" in legacy_columns else None,
+                    row["client_ip"] if "client_ip" in legacy_columns else None,
+                    row["created_at"] if "created_at" in legacy_columns else None,
+                ),
+            )
+        conn.execute("DROP TABLE distribution_logs_legacy")
+
+    @staticmethod
+    def _extract_payload_value(payload: dict, field_name: str) -> str:
+        if field_name in payload and payload[field_name]:
+            return str(payload[field_name])
+        lower_field = field_name.lower()
+        for key, value in payload.items():
+            if key.lower() == lower_field and value:
+                return str(value)
+        return ""

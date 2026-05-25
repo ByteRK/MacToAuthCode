@@ -32,7 +32,8 @@ class AuthCodeService:
                     action="reused",
                     message="设备重复请求，返回已分配授权码",
                     client_ip=client_ip,
-                    code=existing["code"],
+                    code=existing["did"],
+                    payload_json=existing["payload_json"],
                 )
                 return {
                     "success": True,
@@ -40,7 +41,7 @@ class AuthCodeService:
                     "data": {
                         "pid": normalized_pid,
                         "mac": normalized_mac,
-                        "display_code": existing["code"],
+                        "display_code": existing["did"],
                         "payload": existing["payload"],
                         "assigned_at": existing["assigned_at"],
                         "source_batch": existing["source_batch"],
@@ -75,7 +76,8 @@ class AuthCodeService:
                 action="assigned",
                 message="授权码分配成功",
                 client_ip=client_ip,
-                code=assigned["code"],
+                code=assigned["did"],
+                payload_json=assigned["payload_json"],
             )
             return {
                 "success": True,
@@ -83,7 +85,7 @@ class AuthCodeService:
                 "data": {
                     "pid": normalized_pid,
                     "mac": normalized_mac,
-                    "display_code": assigned["code"],
+                    "display_code": assigned["did"],
                     "payload": assigned["payload"],
                     "assigned_at": assigned["assigned_at"],
                     "source_batch": assigned["source_batch"],

@@ -18,6 +18,7 @@
         {% include "dashboard/panels/logs.html" %}
       </main>
     </div>
+    {% include "dashboard/_payload_modal.html" %}
 
     <script type="module" src="{{ url_for('static', filename='js/admin/main.js') }}"></script>
   </body>

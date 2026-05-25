@@ -34,6 +34,7 @@ export async function loadOverview() {
       { key: "mac" },
       { key: "action" },
       { key: "code" },
+      { key: "payload_preview", type: "payload", title: "请求日志载荷" },
       { key: "message" },
       { key: "client_ip" },
     ],

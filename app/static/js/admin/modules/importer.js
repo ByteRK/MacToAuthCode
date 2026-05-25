@@ -15,7 +15,12 @@ export function bindImporter({ refreshOverview, refreshAllocations, refreshInven
         body: formData,
       });
       const info = payload.data;
-      resultNode.textContent = `导入完成：总行数 ${info.total_rows}，新增 ${info.inserted}，跳过重复 ${info.skipped}`;
+      const warningText = (info.warnings || []).length
+        ? `；告警：${info.warnings.join("；")}`
+        : "";
+      resultNode.textContent =
+        `导入完成：总行数 ${info.total_rows}，新增 ${info.inserted}，跳过重复 ${info.skipped}` +
+        warningText;
       form.reset();
       await Promise.all([
         refreshOverview(),

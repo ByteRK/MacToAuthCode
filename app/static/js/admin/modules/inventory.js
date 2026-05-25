@@ -40,11 +40,11 @@ export async function loadCodeDetails() {
     payload.data.items,
     [
       { key: "pid" },
-      { key: "code" },
+      { key: "did" },
       { key: "status", type: "status" },
       { key: "assigned_mac" },
       { key: "source_batch" },
-      { key: "payload_preview" },
+      { key: "payload_preview", type: "payload", title: "授权记录载荷" },
       { key: "assigned_at" },
     ],
     "当前筛选条件下暂无明细"

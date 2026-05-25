@@ -8,10 +8,10 @@ from openpyxl import Workbook, load_workbook
 from app.repositories.auth_code_repository import AuthCodeRepository
 
 
-HEADER_CODE_CANDIDATES = {"auth_code", "code", "license_code", "授权码", "license", "did"}
+REQUIRED_PAYLOAD_FIELDS = ("did", "license")
 HEADER_PID_CANDIDATES = {"pid", "product_pid", "产品pid", "产品id"}
 HEADER_BATCH_CANDIDATES = {"batch", "source_batch", "批次"}
-DISPLAY_PRIORITY = ("auth_code", "license", "did", "code")
+DISPLAY_PRIORITY = ("did", "auth_code", "license", "code")
 
 
 class ExcelService:
@@ -32,14 +32,14 @@ class ExcelService:
         sheet.title = "assigned_codes"
         rows = self.repository.list_assigned_codes_for_export()
         payload_keys = self._collect_payload_keys(rows)
-        sheet.append(["PID", "MAC", "显示标识", "批次", "分配时间", "导入时间", *payload_keys])
+        sheet.append(["PID", "DID", "MAC", "批次", "分配时间", "导入时间", *payload_keys])
 
         for item in rows:
             sheet.append(
                 [
                     item["pid"],
+                    item["did"],
                     item["assigned_mac"],
-                    item["code"],
                     item["source_batch"],
                     item["assigned_at"],
                     item["created_at"],
@@ -96,12 +96,12 @@ class ExcelService:
         header_map: dict[str, int] = {}
         for index, value in enumerate(first_row):
             normalized = str(value or "").strip().lower()
-            if normalized in HEADER_CODE_CANDIDATES:
-                header_map["code"] = index
             if normalized in HEADER_PID_CANDIDATES:
                 header_map["pid"] = index
             if normalized in HEADER_BATCH_CANDIDATES:
                 header_map["batch"] = index
+            if normalized in REQUIRED_PAYLOAD_FIELDS:
+                header_map[normalized] = index
         return header_map
 
     @staticmethod
@@ -154,10 +154,22 @@ class ExcelService:
         if not pid:
             raise ValueError("导入数据缺少 PID，请在 Excel 中提供 pid 列或填写默认 PID")
 
+        missing_fields = [
+            field for field in REQUIRED_PAYLOAD_FIELDS if not self._get_payload_value(payload, field)
+        ]
+        if missing_fields:
+            raise ValueError(
+                f"导入数据缺少必填字段：{', '.join(missing_fields)}。每条记录必须同时包含 did 和 license"
+            )
+
+        did = self._get_payload_value(payload, "did")
+        license_value = self._get_payload_value(payload, "license")
         display_code = self._pick_display_code(payload)
         payload_json = json.dumps(payload, ensure_ascii=False, sort_keys=True)
         return {
             "pid": pid,
+            "did": did,
+            "license": license_value,
             "code": display_code,
             "payload_json": payload_json,
             "payload_hash": hashlib.sha256(payload_json.encode("utf-8")).hexdigest(),
@@ -169,23 +181,7 @@ class ExcelService:
         row: list[object],
         default_pid: str | None,
     ) -> dict[str, str] | None:
-        code = self._extract_cell(row, 0)
-        batch = self._extract_cell(row, 1)
-        pid = (default_pid or "").strip()
-        if not code:
-            return None
-        if not pid:
-            raise ValueError("无表头导入时必须填写默认 PID")
-
-        payload = {"auth_code": code}
-        payload_json = json.dumps(payload, ensure_ascii=False, sort_keys=True)
-        return {
-            "pid": pid,
-            "code": code,
-            "payload_json": payload_json,
-            "payload_hash": hashlib.sha256(payload_json.encode("utf-8")).hexdigest(),
-            "source_batch": batch or None,
-        }
+        raise ValueError("导入文件必须包含表头，并至少提供 did 与 license 两列")
 
     @staticmethod
     def _pick_display_code(payload: dict[str, str]) -> str:
@@ -194,6 +190,16 @@ class ExcelService:
             if lower_map.get(key):
                 return lower_map[key]
         return next(iter(payload.values()))
+
+    @staticmethod
+    def _get_payload_value(payload: dict[str, str], field_name: str) -> str:
+        if field_name in payload and payload[field_name]:
+            return payload[field_name]
+        lowered = field_name.lower()
+        for key, value in payload.items():
+            if key.lower() == lowered and value:
+                return value
+        return ""
 
     @staticmethod
     def _collect_payload_keys(rows: list[dict]) -> list[str]:
