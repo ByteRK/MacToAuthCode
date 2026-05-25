@@ -15,6 +15,17 @@ function renderImportErrors(errors) {
 }
 
 export function bindImporter({ refreshOverview, refreshAllocations, refreshInventory, refreshCodeDetails }) {
+  const fileInput = byId("import-file-input");
+  const fileNote = byId("import-file-note");
+  if (fileInput instanceof HTMLInputElement && fileNote) {
+    fileInput.addEventListener("change", () => {
+      const selectedFile = fileInput.files?.[0];
+      fileNote.textContent = selectedFile
+        ? `已选择：${selectedFile.name}`
+        : "支持 .xlsx，当前未选择文件";
+    });
+  }
+
   byId("import-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -36,6 +47,9 @@ export function bindImporter({ refreshOverview, refreshAllocations, refreshInven
         `导入完成：总行数 ${info.total_rows}，新增 ${info.inserted}，跳过重复 ${info.skipped}` +
         warningText;
       form.reset();
+      if (fileNote) {
+        fileNote.textContent = "支持 .xlsx，当前未选择文件";
+      }
       await Promise.all([
         refreshOverview(),
         refreshAllocations(),

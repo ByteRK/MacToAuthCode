@@ -13,7 +13,8 @@
       </label>
       <label class="file-field">
         <span>Excel 文件</span>
-        <input type="file" name="file" accept=".xlsx" required>
+        <input id="import-file-input" type="file" name="file" accept=".xlsx" required>
+        <span id="import-file-note" class="file-field-note">支持 .xlsx，当前未选择文件</span>
       </label>
       <button type="submit" class="primary-btn">开始导入</button>
     </form>
