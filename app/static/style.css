@@ -392,6 +392,24 @@ th {
   margin: 0;
 }
 
+.log-row-new td {
+  animation: log-row-flash 3s ease;
+}
+
+@keyframes log-row-flash {
+  0% {
+    background: rgba(194, 91, 42, 0.26);
+  }
+
+  45% {
+    background: rgba(194, 91, 42, 0.14);
+  }
+
+  100% {
+    background: transparent;
+  }
+}
+
 .pagination-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;

@@ -2,7 +2,7 @@ import { fetchJson } from "../core/api.js";
 import { renderRows, byId } from "../core/dom.js";
 import { state } from "../core/state.js";
 
-function renderLogs(items) {
+function renderLogs(items, highlightedIds) {
   renderRows(
     "logs-body",
     items,
@@ -16,7 +16,11 @@ function renderLogs(items) {
       { key: "message" },
       { key: "client_ip" },
     ],
-    "暂无请求日志"
+    "暂无请求日志",
+    {
+      getRowClassName: (row) =>
+        highlightedIds.has(String(row.log_id)) ? "log-row-new" : "",
+    }
   );
 }
 
@@ -54,20 +58,47 @@ function startLogsAutoRefresh() {
 }
 
 export async function loadLogs() {
-  const payload = await fetchJson(`/api/admin/logs?limit=${state.logs.limit}`);
-  renderLogs(payload.data.items);
+  const payload = await fetchJson(
+    `/api/admin/logs?limit=${state.logs.limit}&action=${encodeURIComponent(state.logs.action)}`
+  );
+  const items = payload.data.items;
+  const currentIds = items.map((item) => String(item.log_id));
+  let highlightedIds = new Set();
+  if (state.logs.hasLoaded) {
+    highlightedIds = new Set(
+      currentIds.filter((id) => !state.logs.seenLogIds.includes(id))
+    );
+  }
+  state.logs.seenLogIds = currentIds;
+  state.logs.hasLoaded = true;
+  renderLogs(items, highlightedIds);
+  const actionLabel = state.logs.action === "all" ? "全部动作" : state.logs.action;
   setLogsStatus(
-    `最近刷新：${formatRefreshTime(new Date())}，显示最近 ${payload.data.limit} 条请求日志`
+    `最近刷新：${formatRefreshTime(new Date())}，显示 ${actionLabel} 下最近 ${payload.data.limit} 条请求日志`
   );
 }
 
 export function bindLogs() {
+  byId("logs-action-filter").addEventListener("change", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLSelectElement)) {
+      return;
+    }
+    state.logs.action = target.value;
+    state.logs.hasLoaded = false;
+    state.logs.seenLogIds = [];
+    setLogsStatus("正在按动作类型刷新日志...");
+    await loadLogs();
+  });
+
   byId("logs-limit").addEventListener("change", async (event) => {
     const target = event.target;
     if (!(target instanceof HTMLSelectElement)) {
       return;
     }
     state.logs.limit = Number(target.value);
+    state.logs.hasLoaded = false;
+    state.logs.seenLogIds = [];
     await loadLogs();
   });
 

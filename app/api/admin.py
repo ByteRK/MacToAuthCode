@@ -86,8 +86,14 @@ def overview():
 def logs():
     dashboard_service = current_app.extensions["dashboard_service"]
     limit = min(max(int(request.args.get("limit", "20")), 5), 100)
-    data = dashboard_service.get_recent_logs(limit=limit)
-    return jsonify({"success": True, "data": {"items": data, "limit": limit}})
+    action = request.args.get("action", "all").strip()
+    data = dashboard_service.get_recent_logs(limit=limit, action=action)
+    return jsonify(
+        {
+            "success": True,
+            "data": {"items": data, "limit": limit, "action": action},
+        }
+    )
 
 
 @admin_bp.get("/api/admin/allocations")

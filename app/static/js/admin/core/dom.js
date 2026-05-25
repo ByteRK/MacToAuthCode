@@ -9,7 +9,7 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-export function renderRows(targetId, rows, columns, emptyText) {
+export function renderRows(targetId, rows, columns, emptyText, options = {}) {
   const body = byId(targetId);
   if (!rows.length) {
     body.innerHTML = `<tr><td colspan="${columns.length}">${emptyText}</td></tr>`;
@@ -35,7 +35,9 @@ export function renderRows(targetId, rows, columns, emptyText) {
           return `<td>${escapeHtml(row[column.key] ?? "-")}</td>`;
         })
         .join("");
-      return `<tr>${tds}</tr>`;
+      const rowClassName = options.getRowClassName?.(row) || "";
+      const classAttribute = rowClassName ? ` class="${escapeHtml(rowClassName)}"` : "";
+      return `<tr${classAttribute}>${tds}</tr>`;
     })
     .join("");
 }

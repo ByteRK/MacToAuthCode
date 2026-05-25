@@ -166,16 +166,29 @@ class AuthCodeRepository:
             "distribution_requests": logs,
         }
 
-    def fetch_recent_logs(self, limit: int = 20) -> list[dict[str, Any]]:
+    def fetch_recent_logs(
+        self,
+        *,
+        limit: int = 20,
+        action: str = "all",
+    ) -> list[dict[str, Any]]:
+        clauses = []
+        params: list[Any] = []
+        if action in {"assigned", "reused", "exhausted"}:
+            clauses.append("action = ?")
+            params.append(action)
+
+        where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
         with self.database.connection() as conn:
             rows = conn.execute(
-                """
-                SELECT pid, mac, code, payload_json, action, message, client_ip, created_at
+                f"""
+                SELECT id AS log_id, pid, mac, code, payload_json, action, message, client_ip, created_at
                 FROM distribution_logs
+                {where_sql}
                 ORDER BY id DESC
                 LIMIT ?
                 """,
-                (limit,),
+                [*params, limit],
             ).fetchall()
         return [self._decode_log_row(row) for row in rows]
 

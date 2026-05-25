@@ -152,6 +152,50 @@ class PlatformTestCase(TestCase):
             self.assertTrue(payload["success"])
             self.assertGreaterEqual(len(payload["data"]["items"]), 1)
             self.assertEqual(payload["data"]["items"][0]["pid"], "P1")
+            self.assertIn("log_id", payload["data"]["items"][0])
+
+    def test_admin_logs_api_supports_action_filter(self):
+        with TemporaryDirectory() as temp_dir:
+            app = self.create_test_app(temp_dir)
+            repo = app.extensions["auth_code_repository"]
+            client = app.test_client()
+            client.post("/login", data={"username": "admin", "password": "password"})
+
+            repo.bulk_insert_codes(
+                [
+                    {
+                        "pid": "P1",
+                        "did": "DID-LOG-001",
+                        "license": "LIC-LOG-001",
+                        "code": "DID-LOG-001",
+                        "payload_json": "{\"did\": \"DID-LOG-001\", \"license\": \"LIC-LOG-001\"}",
+                        "payload_hash": "log-hash-001",
+                        "source_batch": "B1",
+                    },
+                ]
+            )
+
+            client.post(
+                "/api/device/authorize",
+                json={"mac": "AA-BB-CC-11-22-33", "pid": "P1"},
+            )
+            client.post(
+                "/api/device/authorize",
+                json={"mac": "AA-BB-CC-11-22-33", "pid": "P1"},
+            )
+            client.post(
+                "/api/device/authorize",
+                json={"mac": "AA-BB-CC-44-55-66", "pid": "PX"},
+            )
+
+            response = client.get("/api/admin/logs?limit=20&action=reused")
+            payload = response.get_json()
+
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(payload["success"])
+            self.assertEqual(payload["data"]["action"], "reused")
+            self.assertEqual(len(payload["data"]["items"]), 1)
+            self.assertEqual(payload["data"]["items"][0]["action"], "reused")
 
     def test_excel_import_supports_same_did_under_different_pid(self):
         with TemporaryDirectory() as temp_dir:

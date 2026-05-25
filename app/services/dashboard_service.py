@@ -51,5 +51,5 @@ class DashboardService:
             page_size=page_size,
         )
 
-    def get_recent_logs(self, *, limit: int) -> list[dict]:
-        return self.repository.fetch_recent_logs(limit=limit)
+    def get_recent_logs(self, *, limit: int, action: str) -> list[dict]:
+        return self.repository.fetch_recent_logs(limit=limit, action=action)
