@@ -83,36 +83,40 @@ class AuthCodeRepository:
         inserted = 0
         skipped = 0
         warnings: list[str] = []
-        duplicate_dids: list[str] = []
+        duplicate_keys: list[str] = []
         row_list = list(rows)
         if not row_list:
             return {"inserted": 0, "skipped": 0, "warnings": []}
 
-        file_duplicate_dids = self._collect_duplicate_dids(row_list)
-        if file_duplicate_dids:
-            duplicate_dids.extend(sorted(file_duplicate_dids))
+        file_duplicate_keys = self._collect_duplicate_pid_dids(row_list)
+        if file_duplicate_keys:
+            duplicate_keys.extend(sorted(file_duplicate_keys))
             warnings.append(
-                f"以下 DID 在本次导入文件中重复，已跳过重复记录：{', '.join(sorted(file_duplicate_dids))}"
+                f"以下 PID + DID 在本次导入文件中重复，已跳过重复记录：{', '.join(sorted(file_duplicate_keys))}"
             )
 
         with self.database.connection() as conn:
-            existing_dids = self.find_existing_dids(
+            existing_keys = self.find_existing_pid_dids(
                 conn,
-                [row["did"] for row in row_list if row.get("did")],
+                [
+                    (row["pid"], row["did"])
+                    for row in row_list
+                    if row.get("pid") and row.get("did")
+                ],
             )
-            if existing_dids:
-                duplicate_dids.extend(sorted(existing_dids))
+            if existing_keys:
+                duplicate_keys.extend(sorted(existing_keys))
                 warnings.append(
-                    f"以下 DID 已存在库存中，导入时已跳过：{', '.join(sorted(existing_dids))}"
+                    f"以下 PID + DID 已存在库存中，导入时已跳过：{', '.join(sorted(existing_keys))}"
                 )
 
-            seen_dids: set[str] = set()
+            seen_keys: set[tuple[str, str]] = set()
             for row in row_list:
-                did = row["did"]
-                if did in existing_dids or did in seen_dids:
+                key = (row["pid"], row["did"])
+                if self._format_pid_did(*key) in existing_keys or key in seen_keys:
                     skipped += 1
                     continue
-                seen_dids.add(did)
+                seen_keys.add(key)
                 cursor = conn.execute(
                     """
                     INSERT OR IGNORE INTO auth_codes (
@@ -137,7 +141,7 @@ class AuthCodeRepository:
         return {
             "inserted": inserted,
             "skipped": skipped,
-            "duplicate_dids": sorted(set(duplicate_dids)),
+            "duplicate_records": sorted(set(duplicate_keys)),
             "warnings": warnings,
         }
 
@@ -325,29 +329,45 @@ class AuthCodeRepository:
         return [self._decode_row(row) for row in rows]
 
     @staticmethod
-    def _collect_duplicate_dids(rows: list[dict[str, str]]) -> set[str]:
-        seen: set[str] = set()
+    def _collect_duplicate_pid_dids(rows: list[dict[str, str]]) -> set[str]:
+        seen: set[tuple[str, str]] = set()
         duplicates: set[str] = set()
         for row in rows:
+            pid = row.get("pid", "").strip()
             did = row.get("did", "").strip()
-            if not did:
+            if not pid or not did:
                 continue
-            if did in seen:
-                duplicates.add(did)
-            seen.add(did)
+            key = (pid, did)
+            if key in seen:
+                duplicates.add(AuthCodeRepository._format_pid_did(pid, did))
+            seen.add(key)
         return duplicates
 
     @staticmethod
-    def find_existing_dids(conn, dids: list[str]) -> set[str]:
-        normalized = sorted({did.strip() for did in dids if did.strip()})
+    def find_existing_pid_dids(conn, pid_dids: list[tuple[str, str]]) -> set[str]:
+        normalized = sorted(
+            {
+                (pid.strip(), did.strip())
+                for pid, did in pid_dids
+                if pid.strip() and did.strip()
+            }
+        )
         if not normalized:
             return set()
-        placeholders = ", ".join("?" for _ in normalized)
+        where_sql = " OR ".join("(pid = ? AND did = ?)" for _ in normalized)
+        params = [value for pair in normalized for value in pair]
         rows = conn.execute(
-            f"SELECT did FROM auth_codes WHERE did IN ({placeholders})",
-            normalized,
+            f"SELECT pid, did FROM auth_codes WHERE {where_sql}",
+            params,
         ).fetchall()
-        return {row["did"] for row in rows}
+        return {
+            AuthCodeRepository._format_pid_did(row["pid"], row["did"])
+            for row in rows
+        }
+
+    @staticmethod
+    def _format_pid_did(pid: str, did: str) -> str:
+        return f"{pid} / {did}"
 
     @staticmethod
     def _decode_row(row) -> dict[str, Any]:

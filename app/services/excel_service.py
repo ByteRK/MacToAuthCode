@@ -81,14 +81,23 @@ class ExcelService:
 
         data_rows = values[1:] if has_header else values
         parsed_rows: list[dict[str, str]] = []
-        for row in data_rows:
+        errors: list[str] = []
+        start_row_number = 2 if has_header else 1
+        for offset, row in enumerate(data_rows):
             current = list(row)
-            if has_header:
-                parsed = self._parse_structured_row(current, first_row, default_pid)
-            else:
-                parsed = self._parse_simple_row(current, default_pid)
+            row_number = start_row_number + offset
+            try:
+                if has_header:
+                    parsed = self._parse_structured_row(current, first_row, default_pid)
+                else:
+                    parsed = self._parse_simple_row(current, default_pid)
+            except ValueError as exc:
+                errors.append(f"第 {row_number} 行：{exc}")
+                continue
             if parsed:
                 parsed_rows.append(parsed)
+        if errors:
+            raise ValueError("导入校验失败，请先修正以下问题后再重试：\n" + "\n".join(errors))
         return parsed_rows
 
     @staticmethod

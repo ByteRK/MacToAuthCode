@@ -69,23 +69,52 @@ class PlatformTestCase(TestCase):
             self.assertEqual(second.get_json()["data"]["mode"], "reused")
             self.assertEqual(third.get_json()["data"]["display_code"], "DID-P2-001")
 
-    def test_excel_import_requires_did_and_license(self):
+    def test_excel_import_reports_all_invalid_rows_and_does_not_write_anything(self):
         with TemporaryDirectory() as temp_dir:
             app = self.create_test_app(temp_dir)
             excel_service = app.extensions["excel_service"]
+            repo = app.extensions["auth_code_repository"]
 
             workbook = Workbook()
             sheet = workbook.active
-            sheet.append(["did", "source_batch"])
-            sheet.append(["DID-001", "B1"])
+            sheet.append(["did", "license", "source_batch"])
+            sheet.append(["DID-001", "LIC-001", "B1"])
+            sheet.append(["", "LIC-002", "B1"])
+            sheet.append(["DID-003", "", "B1"])
             buffer = BytesIO()
             workbook.save(buffer)
             buffer.seek(0)
 
-            with self.assertRaisesRegex(ValueError, "did 和 license"):
+            with self.assertRaisesRegex(ValueError, "第 3 行") as ctx:
                 excel_service.import_codes(buffer, default_pid="PX")
+            self.assertIn("第 4 行", str(ctx.exception))
 
-    def test_excel_import_supports_default_pid_and_warns_on_duplicate_did(self):
+            codes = repo.list_codes(status="all", search="PX", page=1, page_size=10)
+            self.assertEqual(codes["total"], 0)
+
+    def test_excel_import_supports_same_did_under_different_pid(self):
+        with TemporaryDirectory() as temp_dir:
+            app = self.create_test_app(temp_dir)
+            excel_service = app.extensions["excel_service"]
+            repo = app.extensions["auth_code_repository"]
+
+            workbook = Workbook()
+            sheet = workbook.active
+            sheet.append(["pid", "did", "license", "source_batch"])
+            sheet.append(["P1", "DID-001", "LIC-001", "B1"])
+            sheet.append(["P2", "DID-001", "LIC-002", "B2"])
+            buffer = BytesIO()
+            workbook.save(buffer)
+            buffer.seek(0)
+
+            result = excel_service.import_codes(buffer)
+            self.assertEqual(result["inserted"], 2)
+            self.assertEqual(result["skipped"], 0)
+
+            codes = repo.list_codes(status="all", search="DID-001", page=1, page_size=10)
+            self.assertEqual(codes["total"], 2)
+
+    def test_excel_import_warns_on_duplicate_pid_and_did(self):
         with TemporaryDirectory() as temp_dir:
             app = self.create_test_app(temp_dir)
             excel_service = app.extensions["excel_service"]
@@ -93,35 +122,35 @@ class PlatformTestCase(TestCase):
 
             initial_workbook = Workbook()
             initial_sheet = initial_workbook.active
-            initial_sheet.append(["did", "license", "source_batch"])
-            initial_sheet.append(["DID-001", "LIC-001", "B1"])
+            initial_sheet.append(["pid", "did", "license", "source_batch"])
+            initial_sheet.append(["PX", "DID-001", "LIC-001", "B1"])
             initial_buffer = BytesIO()
             initial_workbook.save(initial_buffer)
             initial_buffer.seek(0)
 
-            initial_result = excel_service.import_codes(initial_buffer, default_pid="PX")
+            initial_result = excel_service.import_codes(initial_buffer)
             self.assertEqual(initial_result["inserted"], 1)
 
             workbook = Workbook()
             sheet = workbook.active
-            sheet.append(["did", "license", "source_batch"])
-            sheet.append(["DID-001", "LIC-001-NEW", "B1"])
-            sheet.append(["DID-002", "LIC-002", "B1"])
-            sheet.append(["DID-002", "LIC-002-DUP", "B1"])
+            sheet.append(["pid", "did", "license", "source_batch"])
+            sheet.append(["PX", "DID-001", "LIC-001-NEW", "B1"])
+            sheet.append(["PX", "DID-002", "LIC-002", "B1"])
+            sheet.append(["PX", "DID-002", "LIC-002-DUP", "B1"])
+            sheet.append(["PY", "DID-001", "LIC-003", "B2"])
             buffer = BytesIO()
             workbook.save(buffer)
             buffer.seek(0)
 
-            result = excel_service.import_codes(buffer, default_pid="PX")
-            self.assertEqual(result["inserted"], 1)
+            result = excel_service.import_codes(buffer)
+            self.assertEqual(result["inserted"], 2)
             self.assertEqual(result["skipped"], 2)
-            self.assertIn("DID-001", result["duplicate_dids"])
-            self.assertIn("DID-002", result["duplicate_dids"])
+            self.assertIn("PX / DID-001", result["duplicate_records"])
+            self.assertIn("PX / DID-002", result["duplicate_records"])
             self.assertTrue(result["warnings"])
 
-            codes = repo.list_codes(status="all", search="PX", page=1, page_size=10)
-            self.assertEqual(len(codes["items"]), 2)
-            self.assertEqual(codes["items"][0]["did"][:4], "DID-")
+            codes = repo.list_codes(status="all", search="DID-001", page=1, page_size=10)
+            self.assertEqual(codes["total"], 2)
 
     def test_inventory_summary_is_grouped_by_pid(self):
         with TemporaryDirectory() as temp_dir:
