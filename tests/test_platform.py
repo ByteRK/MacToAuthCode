@@ -336,6 +336,78 @@ class PlatformTestCase(TestCase):
             self.assertEqual(rows[1][2], "AA:BB:CC:44:55:66")
             self.assertEqual(rows[1][3], "exhausted")
 
+    def test_admin_logs_export_supports_time_range_filter(self):
+        with TemporaryDirectory() as temp_dir:
+            app = self.create_test_app(temp_dir)
+            database = app.extensions["database"]
+            client = app.test_client()
+            client.post("/login", data={"username": "admin", "password": "password"})
+
+            with database.connection() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO distribution_logs (
+                        pid, mac, code, payload_json, action, message, client_ip, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        "P1",
+                        "AA:BB:CC:11:22:33",
+                        "DID-TIME-001",
+                        "{\"did\": \"DID-TIME-001\", \"license\": \"LIC-TIME-001\"}",
+                        "assigned",
+                        "time-in-range",
+                        "127.0.0.1",
+                        "2026-05-25 10:15:00",
+                    ),
+                )
+                conn.execute(
+                    """
+                    INSERT INTO distribution_logs (
+                        pid, mac, code, payload_json, action, message, client_ip, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        "P2",
+                        "AA:BB:CC:44:55:66",
+                        "DID-TIME-002",
+                        "{\"did\": \"DID-TIME-002\", \"license\": \"LIC-TIME-002\"}",
+                        "reused",
+                        "time-out-of-range",
+                        "127.0.0.1",
+                        "2026-05-25 12:30:00",
+                    ),
+                )
+
+            response = client.get(
+                "/api/admin/export-logs?start_at=2026-05-25T10:00&end_at=2026-05-25T11:00"
+            )
+
+            self.assertEqual(response.status_code, 200)
+            workbook = load_workbook(BytesIO(response.data))
+            sheet = workbook.active
+            rows = list(sheet.iter_rows(values_only=True))
+
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(rows[1][0], "2026-05-25 10:15:00")
+            self.assertEqual(rows[1][1], "P1")
+            self.assertEqual(rows[1][4], "DID-TIME-001")
+
+    def test_admin_logs_export_rejects_invalid_time_range(self):
+        with TemporaryDirectory() as temp_dir:
+            app = self.create_test_app(temp_dir)
+            client = app.test_client()
+            client.post("/login", data={"username": "admin", "password": "password"})
+
+            response = client.get(
+                "/api/admin/export-logs?start_at=2026-05-25T12:00&end_at=2026-05-25T11:00"
+            )
+            payload = response.get_json()
+
+            self.assertEqual(response.status_code, 400)
+            self.assertFalse(payload["success"])
+            self.assertIn("开始时间不能晚于结束时间", payload["message"])
+
     def test_excel_import_supports_same_did_under_different_pid(self):
         with TemporaryDirectory() as temp_dir:
             app = self.create_test_app(temp_dir)

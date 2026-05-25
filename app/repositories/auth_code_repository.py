@@ -173,7 +173,12 @@ class AuthCodeRepository:
         action: str = "all",
         search: str = "",
     ) -> list[dict[str, Any]]:
-        where_sql, params = self._build_log_filters(action=action, search=search)
+        where_sql, params = self._build_log_filters(
+            action=action,
+            search=search,
+            start_at="",
+            end_at="",
+        )
         with self.database.connection() as conn:
             rows = conn.execute(
                 f"""
@@ -192,8 +197,15 @@ class AuthCodeRepository:
         *,
         action: str = "all",
         search: str = "",
+        start_at: str = "",
+        end_at: str = "",
     ) -> list[dict[str, Any]]:
-        where_sql, params = self._build_log_filters(action=action, search=search)
+        where_sql, params = self._build_log_filters(
+            action=action,
+            search=search,
+            start_at=start_at,
+            end_at=end_at,
+        )
         with self.database.connection() as conn:
             rows = conn.execute(
                 f"""
@@ -397,7 +409,13 @@ class AuthCodeRepository:
         return f"{pid} / {did}"
 
     @staticmethod
-    def _build_log_filters(*, action: str, search: str) -> tuple[str, list[Any]]:
+    def _build_log_filters(
+        *,
+        action: str,
+        search: str,
+        start_at: str,
+        end_at: str,
+    ) -> tuple[str, list[Any]]:
         clauses: list[str] = []
         params: list[Any] = []
         if action in {"assigned", "reused", "exhausted"}:
@@ -414,6 +432,12 @@ class AuthCodeRepository:
             clauses.append(f"(pid LIKE ? OR {mac_conditions})")
             params.append(f"%{raw_search}%")
             params.extend(sorted(mac_keywords))
+        if start_at:
+            clauses.append("created_at >= ?")
+            params.append(start_at)
+        if end_at:
+            clauses.append("created_at <= ?")
+            params.append(end_at)
         if clauses:
             return f"WHERE {' AND '.join(clauses)}", params
         return "", params

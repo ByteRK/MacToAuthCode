@@ -383,6 +383,11 @@ th {
   width: 220px;
 }
 
+.logs-time-field input {
+  min-width: 188px;
+  width: 188px;
+}
+
 .switch-field {
   display: inline-flex;
   align-items: center;

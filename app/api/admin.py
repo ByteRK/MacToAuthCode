@@ -1,4 +1,5 @@
 from functools import wraps
+from datetime import datetime
 
 from flask import (
     Blueprint,
@@ -16,6 +17,30 @@ from app.services.excel_service import ImportValidationError
 
 
 admin_bp = Blueprint("admin", __name__)
+
+
+def _normalize_log_export_datetime(value: str, *, is_end: bool) -> str:
+    raw = value.strip()
+    if not raw:
+        return ""
+
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+        try:
+            parsed = datetime.strptime(raw, fmt)
+            return parsed.strftime("%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            continue
+
+    for fmt in ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M"):
+        try:
+            parsed = datetime.strptime(raw, fmt)
+            seconds = 59 if is_end else 0
+            normalized = parsed.replace(second=seconds)
+            return normalized.strftime("%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            continue
+
+    raise ValueError("时间范围格式不正确，请使用有效的日期时间")
 
 
 def admin_login_required(view):
@@ -204,7 +229,22 @@ def export_logs():
     excel_service = current_app.extensions["excel_service"]
     action = request.args.get("action", "all").strip()
     search = request.args.get("search", "").strip()
-    stream = excel_service.build_logs_workbook(action=action, search=search)
+    raw_start_at = request.args.get("start_at", "").strip()
+    raw_end_at = request.args.get("end_at", "").strip()
+    try:
+        start_at = _normalize_log_export_datetime(raw_start_at, is_end=False)
+        end_at = _normalize_log_export_datetime(raw_end_at, is_end=True)
+    except ValueError as exc:
+        return jsonify({"success": False, "message": str(exc)}), 400
+    if start_at and end_at and start_at > end_at:
+        return jsonify({"success": False, "message": "开始时间不能晚于结束时间"}), 400
+
+    stream = excel_service.build_logs_workbook(
+        action=action,
+        search=search,
+        start_at=start_at,
+        end_at=end_at,
+    )
     suffix = action if action in {"assigned", "reused", "exhausted"} else "all"
     return send_file(
         stream,

@@ -15,12 +15,46 @@ function currentLogQuery() {
   }).toString();
 }
 
+function currentLogExportQuery() {
+  const params = new URLSearchParams({
+    action: state.logs.action,
+    search: state.logs.search,
+  });
+  const startInput = byId("logs-export-start-at");
+  if (startInput instanceof HTMLInputElement && startInput.value) {
+    params.set("start_at", startInput.value);
+  }
+  const endInput = byId("logs-export-end-at");
+  if (endInput instanceof HTMLInputElement && endInput.value) {
+    params.set("end_at", endInput.value);
+  }
+  return params.toString();
+}
+
 function applySearchInput() {
   const input = byId("logs-search-input");
   if (!(input instanceof HTMLInputElement)) {
     return;
   }
   state.logs.search = input.value.trim();
+}
+
+function readExportRange() {
+  const startInput = byId("logs-export-start-at");
+  const endInput = byId("logs-export-end-at");
+  return {
+    startAt: startInput instanceof HTMLInputElement ? startInput.value : "",
+    endAt: endInput instanceof HTMLInputElement ? endInput.value : "",
+  };
+}
+
+function validateExportRange() {
+  const { startAt, endAt } = readExportRange();
+  if (startAt && endAt && startAt > endAt) {
+    setLogsStatus("开始时间不能晚于结束时间，请调整后再导出。");
+    return false;
+  }
+  return true;
 }
 
 function renderLogs(items, highlightedIds) {
@@ -171,7 +205,11 @@ export function bindLogs() {
 
   byId("logs-export-btn").addEventListener("click", () => {
     applySearchInput();
-    window.location.href = `/api/admin/export-logs?${currentLogQuery()}`;
+    if (!validateExportRange()) {
+      return;
+    }
+    setLogsStatus("正在按当前筛选条件导出日志...");
+    window.location.href = `/api/admin/export-logs?${currentLogExportQuery()}`;
   });
 
   document.addEventListener("admin:panelchange", async (event) => {
