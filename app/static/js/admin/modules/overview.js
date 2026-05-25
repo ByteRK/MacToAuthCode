@@ -1,5 +1,5 @@
 import { fetchJson } from "../core/api.js";
-import { renderRows, byId } from "../core/dom.js";
+import { byId } from "../core/dom.js";
 
 function renderSummary(summary) {
   const container = byId("summary-cards");
@@ -25,19 +25,4 @@ function renderSummary(summary) {
 export async function loadOverview() {
   const payload = await fetchJson("/api/admin/overview");
   renderSummary(payload.data.summary);
-  renderRows(
-    "logs-body",
-    payload.data.recent_logs,
-    [
-      { key: "created_at" },
-      { key: "pid" },
-      { key: "mac" },
-      { key: "action" },
-      { key: "code" },
-      { key: "payload_preview", type: "payload", title: "请求日志载荷" },
-      { key: "message" },
-      { key: "client_ip" },
-    ],
-    "暂无请求日志"
-  );
 }

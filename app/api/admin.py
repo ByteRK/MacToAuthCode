@@ -81,6 +81,15 @@ def overview():
     return jsonify({"success": True, "data": dashboard_service.get_overview()})
 
 
+@admin_bp.get("/api/admin/logs")
+@admin_login_required
+def logs():
+    dashboard_service = current_app.extensions["dashboard_service"]
+    limit = min(max(int(request.args.get("limit", "20")), 5), 100)
+    data = dashboard_service.get_recent_logs(limit=limit)
+    return jsonify({"success": True, "data": {"items": data, "limit": limit}})
+
+
 @admin_bp.get("/api/admin/allocations")
 @admin_login_required
 def allocations():

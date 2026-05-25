@@ -7,10 +7,8 @@ class DashboardService:
 
     def get_overview(self) -> dict:
         summary = self.repository.fetch_summary()
-        recent_logs = self.repository.fetch_recent_logs()
         return {
             "summary": summary,
-            "recent_logs": recent_logs,
         }
 
     def get_allocations(self, *, search: str, page: int, page_size: int) -> dict:
@@ -52,3 +50,6 @@ class DashboardService:
             page=page,
             page_size=page_size,
         )
+
+    def get_recent_logs(self, *, limit: int) -> list[dict]:
+        return self.repository.fetch_recent_logs(limit=limit)

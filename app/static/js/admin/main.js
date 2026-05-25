@@ -3,6 +3,7 @@ import { loadOverview } from "./modules/overview.js";
 import { bindAllocationSearch, loadAllocations } from "./modules/allocations.js";
 import { bindInventory, loadInventorySummary, loadCodeDetails } from "./modules/inventory.js";
 import { bindImporter } from "./modules/importer.js";
+import { bindLogs } from "./modules/logs.js";
 import { bindPayloadModal } from "./modules/modal.js";
 
 async function bootstrap() {
@@ -10,6 +11,7 @@ async function bootstrap() {
   bindPayloadModal();
   bindAllocationSearch();
   bindInventory();
+  bindLogs();
   bindImporter({
     refreshOverview: loadOverview,
     refreshAllocations: loadAllocations,

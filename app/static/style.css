@@ -378,6 +378,20 @@ th {
   border-radius: 12px;
 }
 
+.switch-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.switch-field input {
+  width: auto;
+  min-width: auto;
+  margin: 0;
+}
+
 .pagination-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
