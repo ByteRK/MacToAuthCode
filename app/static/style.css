@@ -362,6 +362,22 @@ th {
   font-size: 13px;
 }
 
+.pagination-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pagination-field select,
+.pagination-field input {
+  min-width: 74px;
+  width: 74px;
+  padding: 8px 10px;
+  border-radius: 12px;
+}
+
 .pagination-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;

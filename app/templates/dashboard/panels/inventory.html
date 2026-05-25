@@ -27,9 +27,22 @@
     </div>
     <div class="table-meta" id="inventory-summary-meta"></div>
     <div class="pagination-bar" id="inventory-summary-pagination">
+      <label class="pagination-field">
+        <span>每页</span>
+        <select id="inventory-summary-page-size">
+          <option value="20">20</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </label>
       <button type="button" class="ghost-btn pagination-btn" id="inventory-summary-prev-page">上一页</button>
       <span class="pagination-info" id="inventory-summary-page-indicator">第 1 / 1 页</span>
       <button type="button" class="ghost-btn pagination-btn" id="inventory-summary-next-page">下一页</button>
+      <label class="pagination-field">
+        <span>跳转到</span>
+        <input type="number" id="inventory-summary-page-jump" min="1" value="1">
+      </label>
+      <button type="button" class="ghost-btn pagination-btn" id="inventory-summary-page-go">跳转</button>
     </div>
   </div>
 
@@ -72,9 +85,22 @@
     </div>
     <div class="table-meta" id="codes-meta"></div>
     <div class="pagination-bar" id="codes-pagination">
+      <label class="pagination-field">
+        <span>每页</span>
+        <select id="codes-page-size">
+          <option value="20">20</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </label>
       <button type="button" class="ghost-btn pagination-btn" id="codes-prev-page">上一页</button>
       <span class="pagination-info" id="codes-page-indicator">第 1 / 1 页</span>
       <button type="button" class="ghost-btn pagination-btn" id="codes-next-page">下一页</button>
+      <label class="pagination-field">
+        <span>跳转到</span>
+        <input type="number" id="codes-page-jump" min="1" value="1">
+      </label>
+      <button type="button" class="ghost-btn pagination-btn" id="codes-page-go">跳转</button>
     </div>
   </div>
 </section>

@@ -3,12 +3,18 @@ import { renderRows, renderTableMeta, byId } from "../core/dom.js";
 import { state } from "../core/state.js";
 import { switchPanel } from "./navigation.js";
 
+function clampPage(page, totalPages) {
+  return Math.min(Math.max(page, 1), Math.max(totalPages, 1));
+}
+
 function renderInventorySummaryPagination(result) {
   const totalPages = Math.max(1, Math.ceil(result.total / result.page_size));
   state.inventorySummary.totalPages = totalPages;
   byId("inventory-summary-page-indicator").textContent = `第 ${result.page} / ${totalPages} 页`;
   byId("inventory-summary-prev-page").disabled = result.page <= 1;
   byId("inventory-summary-next-page").disabled = result.page >= totalPages;
+  byId("inventory-summary-page-size").value = String(result.page_size);
+  byId("inventory-summary-page-jump").value = String(result.page);
 }
 
 function renderCodePagination(result) {
@@ -17,18 +23,25 @@ function renderCodePagination(result) {
   byId("codes-page-indicator").textContent = `第 ${result.page} / ${totalPages} 页`;
   byId("codes-prev-page").disabled = result.page <= 1;
   byId("codes-next-page").disabled = result.page >= totalPages;
+  byId("codes-page-size").value = String(result.page_size);
+  byId("codes-page-jump").value = String(result.page);
 }
 
 function resetInventorySummaryPagination() {
   byId("inventory-summary-page-indicator").textContent = "第 1 / 1 页";
   byId("inventory-summary-prev-page").disabled = true;
   byId("inventory-summary-next-page").disabled = true;
+  byId("inventory-summary-page-jump").value = "1";
 }
 
 function resetCodeDetailsView() {
   byId("codes-body").innerHTML = '<tr><td colspan="7">请选择 PID 后查看明细。</td></tr>';
   byId("codes-meta").textContent = "";
   byId("codes-page-indicator").textContent = "第 1 / 1 页";
+  byId("codes-prev-page").disabled = true;
+  byId("codes-next-page").disabled = true;
+  byId("codes-page-jump").value = "1";
+  byId("codes-page-go").disabled = true;
   byId("codes-prev-page").disabled = true;
   byId("codes-next-page").disabled = true;
 }
@@ -81,6 +94,7 @@ export async function loadCodeDetails() {
   );
   renderTableMeta("codes-meta", payload.data, `PID ${state.selectedPid} 明细`);
   renderCodePagination(payload.data);
+  byId("codes-page-go").disabled = false;
 }
 
 export function selectPid(pid) {
@@ -138,6 +152,34 @@ export function bindInventory() {
     await loadCodeDetails();
   });
 
+  byId("codes-page-size").addEventListener("change", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLSelectElement)) {
+      return;
+    }
+    state.codeDetails.pageSize = Number(target.value);
+    state.codeDetails.page = 1;
+    await loadCodeDetails();
+  });
+
+  byId("codes-page-go").addEventListener("click", async () => {
+    if (!state.selectedPid) {
+      return;
+    }
+    const totalPages = state.codeDetails.totalPages || 1;
+    const desiredPage = Number(byId("codes-page-jump").value || "1");
+    state.codeDetails.page = clampPage(desiredPage, totalPages);
+    await loadCodeDetails();
+  });
+
+  byId("codes-page-jump").addEventListener("keydown", async (event) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+    event.preventDefault();
+    byId("codes-page-go").click();
+  });
+
   byId("inventory-summary-prev-page").addEventListener("click", async () => {
     if (state.inventorySummary.page <= 1) {
       return;
@@ -153,6 +195,31 @@ export function bindInventory() {
     }
     state.inventorySummary.page += 1;
     await loadInventorySummary();
+  });
+
+  byId("inventory-summary-page-size").addEventListener("change", async (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLSelectElement)) {
+      return;
+    }
+    state.inventorySummary.pageSize = Number(target.value);
+    state.inventorySummary.page = 1;
+    await loadInventorySummary();
+  });
+
+  byId("inventory-summary-page-go").addEventListener("click", async () => {
+    const totalPages = state.inventorySummary.totalPages || 1;
+    const desiredPage = Number(byId("inventory-summary-page-jump").value || "1");
+    state.inventorySummary.page = clampPage(desiredPage, totalPages);
+    await loadInventorySummary();
+  });
+
+  byId("inventory-summary-page-jump").addEventListener("keydown", async (event) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+    event.preventDefault();
+    byId("inventory-summary-page-go").click();
   });
 
   resetInventorySummaryPagination();
