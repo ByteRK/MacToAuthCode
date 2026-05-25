@@ -378,6 +378,11 @@ th {
   border-radius: 12px;
 }
 
+.logs-search-field input {
+  min-width: 220px;
+  width: 220px;
+}
+
 .switch-field {
   display: inline-flex;
   align-items: center;

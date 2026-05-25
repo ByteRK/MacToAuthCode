@@ -171,8 +171,9 @@ class AuthCodeRepository:
         *,
         limit: int = 20,
         action: str = "all",
+        search: str = "",
     ) -> list[dict[str, Any]]:
-        where_sql, params = self._build_log_filters(action)
+        where_sql, params = self._build_log_filters(action=action, search=search)
         with self.database.connection() as conn:
             rows = conn.execute(
                 f"""
@@ -186,8 +187,13 @@ class AuthCodeRepository:
             ).fetchall()
         return [self._decode_log_row(row) for row in rows]
 
-    def list_logs_for_export(self, *, action: str = "all") -> list[dict[str, Any]]:
-        where_sql, params = self._build_log_filters(action)
+    def list_logs_for_export(
+        self,
+        *,
+        action: str = "all",
+        search: str = "",
+    ) -> list[dict[str, Any]]:
+        where_sql, params = self._build_log_filters(action=action, search=search)
         with self.database.connection() as conn:
             rows = conn.execute(
                 f"""
@@ -391,11 +397,25 @@ class AuthCodeRepository:
         return f"{pid} / {did}"
 
     @staticmethod
-    def _build_log_filters(action: str) -> tuple[str, list[Any]]:
+    def _build_log_filters(*, action: str, search: str) -> tuple[str, list[Any]]:
+        clauses: list[str] = []
         params: list[Any] = []
         if action in {"assigned", "reused", "exhausted"}:
+            clauses.append("action = ?")
             params.append(action)
-            return "WHERE action = ?", params
+        if search.strip():
+            raw_search = search.strip()
+            mac_keywords = {
+                f"%{raw_search}%",
+                f"%{raw_search.replace('-', ':')}%",
+                f"%{raw_search.replace(':', '-')}%",
+            }
+            mac_conditions = " OR ".join("mac LIKE ?" for _ in mac_keywords)
+            clauses.append(f"(pid LIKE ? OR {mac_conditions})")
+            params.append(f"%{raw_search}%")
+            params.extend(sorted(mac_keywords))
+        if clauses:
+            return f"WHERE {' AND '.join(clauses)}", params
         return "", params
 
     @staticmethod

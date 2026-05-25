@@ -58,11 +58,11 @@ class ExcelService:
         output.seek(0)
         return output
 
-    def build_logs_workbook(self, action: str = "all") -> BytesIO:
+    def build_logs_workbook(self, action: str = "all", search: str = "") -> BytesIO:
         workbook = Workbook()
         sheet = workbook.active
         sheet.title = "request_logs"
-        rows = self.repository.list_logs_for_export(action=action)
+        rows = self.repository.list_logs_for_export(action=action, search=search)
         payload_keys = self._collect_payload_keys(rows)
         sheet.append(
             ["时间", "PID", "MAC", "动作", "DID", "说明", "来源IP", "载荷JSON", *payload_keys]

@@ -87,11 +87,12 @@ def logs():
     dashboard_service = current_app.extensions["dashboard_service"]
     limit = min(max(int(request.args.get("limit", "20")), 5), 100)
     action = request.args.get("action", "all").strip()
-    data = dashboard_service.get_recent_logs(limit=limit, action=action)
+    search = request.args.get("search", "").strip()
+    data = dashboard_service.get_recent_logs(limit=limit, action=action, search=search)
     return jsonify(
         {
             "success": True,
-            "data": {"items": data, "limit": limit, "action": action},
+            "data": {"items": data, "limit": limit, "action": action, "search": search},
         }
     )
 
@@ -202,7 +203,8 @@ def export_allocations():
 def export_logs():
     excel_service = current_app.extensions["excel_service"]
     action = request.args.get("action", "all").strip()
-    stream = excel_service.build_logs_workbook(action=action)
+    search = request.args.get("search", "").strip()
+    stream = excel_service.build_logs_workbook(action=action, search=search)
     suffix = action if action in {"assigned", "reused", "exhausted"} else "all"
     return send_file(
         stream,

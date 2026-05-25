@@ -197,6 +197,46 @@ class PlatformTestCase(TestCase):
             self.assertEqual(len(payload["data"]["items"]), 1)
             self.assertEqual(payload["data"]["items"][0]["action"], "reused")
 
+    def test_admin_logs_api_supports_pid_or_mac_keyword_filter(self):
+        with TemporaryDirectory() as temp_dir:
+            app = self.create_test_app(temp_dir)
+            repo = app.extensions["auth_code_repository"]
+            client = app.test_client()
+            client.post("/login", data={"username": "admin", "password": "password"})
+
+            repo.bulk_insert_codes(
+                [
+                    {
+                        "pid": "P1",
+                        "did": "DID-LOG-001",
+                        "license": "LIC-LOG-001",
+                        "code": "DID-LOG-001",
+                        "payload_json": "{\"did\": \"DID-LOG-001\", \"license\": \"LIC-LOG-001\"}",
+                        "payload_hash": "log-hash-001",
+                        "source_batch": "B1",
+                    },
+                ]
+            )
+
+            client.post(
+                "/api/device/authorize",
+                json={"mac": "AA-BB-CC-11-22-33", "pid": "P1"},
+            )
+            client.post(
+                "/api/device/authorize",
+                json={"mac": "AA-BB-CC-44-55-66", "pid": "PX"},
+            )
+
+            response = client.get("/api/admin/logs?limit=20&search=44-55-66")
+            payload = response.get_json()
+
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(payload["success"])
+            self.assertEqual(payload["data"]["search"], "44-55-66")
+            self.assertEqual(len(payload["data"]["items"]), 1)
+            self.assertEqual(payload["data"]["items"][0]["pid"], "PX")
+            self.assertEqual(payload["data"]["items"][0]["mac"], "AA:BB:CC:44:55:66")
+
     def test_admin_logs_export_uses_action_filter(self):
         with TemporaryDirectory() as temp_dir:
             app = self.create_test_app(temp_dir)
@@ -248,6 +288,53 @@ class PlatformTestCase(TestCase):
             self.assertEqual(rows[1][1], "P1")
             self.assertEqual(rows[1][3], "reused")
             self.assertEqual(rows[1][4], "DID-EXPORT-001")
+
+    def test_admin_logs_export_supports_keyword_filter(self):
+        with TemporaryDirectory() as temp_dir:
+            app = self.create_test_app(temp_dir)
+            repo = app.extensions["auth_code_repository"]
+            client = app.test_client()
+            client.post("/login", data={"username": "admin", "password": "password"})
+
+            repo.bulk_insert_codes(
+                [
+                    {
+                        "pid": "P1",
+                        "did": "DID-EXPORT-SEARCH-001",
+                        "license": "LIC-EXPORT-SEARCH-001",
+                        "code": "DID-EXPORT-SEARCH-001",
+                        "payload_json": "{\"did\": \"DID-EXPORT-SEARCH-001\", \"license\": \"LIC-EXPORT-SEARCH-001\"}",
+                        "payload_hash": "export-search-hash-001",
+                        "source_batch": "B1",
+                    },
+                ]
+            )
+
+            client.post(
+                "/api/device/authorize",
+                json={"mac": "AA-BB-CC-11-22-33", "pid": "P1"},
+            )
+            client.post(
+                "/api/device/authorize",
+                json={"mac": "AA-BB-CC-44-55-66", "pid": "PX"},
+            )
+
+            response = client.get("/api/admin/export-logs?search=44-55-66")
+
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(
+                "request-logs-all.xlsx",
+                response.headers["Content-Disposition"],
+            )
+
+            workbook = load_workbook(BytesIO(response.data))
+            sheet = workbook.active
+            rows = list(sheet.iter_rows(values_only=True))
+
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(rows[1][1], "PX")
+            self.assertEqual(rows[1][2], "AA:BB:CC:44:55:66")
+            self.assertEqual(rows[1][3], "exhausted")
 
     def test_excel_import_supports_same_did_under_different_pid(self):
         with TemporaryDirectory() as temp_dir:

@@ -2,6 +2,27 @@ import { fetchJson } from "../core/api.js";
 import { renderRows, byId } from "../core/dom.js";
 import { state } from "../core/state.js";
 
+function resetLogHighlights() {
+  state.logs.hasLoaded = false;
+  state.logs.seenLogIds = [];
+}
+
+function currentLogQuery() {
+  return new URLSearchParams({
+    limit: String(state.logs.limit),
+    action: state.logs.action,
+    search: state.logs.search,
+  }).toString();
+}
+
+function applySearchInput() {
+  const input = byId("logs-search-input");
+  if (!(input instanceof HTMLInputElement)) {
+    return;
+  }
+  state.logs.search = input.value.trim();
+}
+
 function renderLogs(items, highlightedIds) {
   renderRows(
     "logs-body",
@@ -58,9 +79,7 @@ function startLogsAutoRefresh() {
 }
 
 export async function loadLogs() {
-  const payload = await fetchJson(
-    `/api/admin/logs?limit=${state.logs.limit}&action=${encodeURIComponent(state.logs.action)}`
-  );
+  const payload = await fetchJson(`/api/admin/logs?${currentLogQuery()}`);
   const items = payload.data.items;
   const currentIds = items.map((item) => String(item.log_id));
   let highlightedIds = new Set();
@@ -73,8 +92,9 @@ export async function loadLogs() {
   state.logs.hasLoaded = true;
   renderLogs(items, highlightedIds);
   const actionLabel = state.logs.action === "all" ? "全部动作" : state.logs.action;
+  const searchLabel = state.logs.search ? `，关键词“${state.logs.search}”` : "";
   setLogsStatus(
-    `最近刷新：${formatRefreshTime(new Date())}，显示 ${actionLabel} 下最近 ${payload.data.limit} 条请求日志`
+    `最近刷新：${formatRefreshTime(new Date())}，显示 ${actionLabel}${searchLabel} 下最近 ${payload.data.limit} 条请求日志`
   );
 }
 
@@ -85,9 +105,37 @@ export function bindLogs() {
       return;
     }
     state.logs.action = target.value;
-    state.logs.hasLoaded = false;
-    state.logs.seenLogIds = [];
+    resetLogHighlights();
     setLogsStatus("正在按动作类型刷新日志...");
+    await loadLogs();
+  });
+
+  byId("logs-search-btn").addEventListener("click", async () => {
+    applySearchInput();
+    resetLogHighlights();
+    setLogsStatus("正在按关键词筛选日志...");
+    await loadLogs();
+  });
+
+  byId("logs-search-reset-btn").addEventListener("click", async () => {
+    const input = byId("logs-search-input");
+    if (input instanceof HTMLInputElement) {
+      input.value = "";
+    }
+    state.logs.search = "";
+    resetLogHighlights();
+    setLogsStatus("已清空关键词，正在恢复全部日志...");
+    await loadLogs();
+  });
+
+  byId("logs-search-input").addEventListener("keydown", async (event) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+    event.preventDefault();
+    applySearchInput();
+    resetLogHighlights();
+    setLogsStatus("正在按关键词筛选日志...");
     await loadLogs();
   });
 
@@ -97,8 +145,7 @@ export function bindLogs() {
       return;
     }
     state.logs.limit = Number(target.value);
-    state.logs.hasLoaded = false;
-    state.logs.seenLogIds = [];
+    resetLogHighlights();
     await loadLogs();
   });
 
@@ -123,8 +170,8 @@ export function bindLogs() {
   });
 
   byId("logs-export-btn").addEventListener("click", () => {
-    const action = encodeURIComponent(state.logs.action);
-    window.location.href = `/api/admin/export-logs?action=${action}`;
+    applySearchInput();
+    window.location.href = `/api/admin/export-logs?${currentLogQuery()}`;
   });
 
   document.addEventListener("admin:panelchange", async (event) => {

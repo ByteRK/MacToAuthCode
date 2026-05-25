@@ -6,6 +6,7 @@ export const state = {
   logs: {
     limit: 20,
     action: "all",
+    search: "",
     autoRefresh: true,
     intervalMs: 5000,
     timerId: null,
