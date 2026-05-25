@@ -122,6 +122,11 @@ export function bindLogs() {
     await loadLogs();
   });
 
+  byId("logs-export-btn").addEventListener("click", () => {
+    const action = encodeURIComponent(state.logs.action);
+    window.location.href = `/api/admin/export-logs?action=${action}`;
+  });
+
   document.addEventListener("admin:panelchange", async (event) => {
     const targetId = event.detail?.targetId;
     state.logs.panelActive = targetId === "logs-panel";

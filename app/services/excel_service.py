@@ -58,6 +58,36 @@ class ExcelService:
         output.seek(0)
         return output
 
+    def build_logs_workbook(self, action: str = "all") -> BytesIO:
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.title = "request_logs"
+        rows = self.repository.list_logs_for_export(action=action)
+        payload_keys = self._collect_payload_keys(rows)
+        sheet.append(
+            ["时间", "PID", "MAC", "动作", "DID", "说明", "来源IP", "载荷JSON", *payload_keys]
+        )
+
+        for item in rows:
+            sheet.append(
+                [
+                    item["created_at"],
+                    item["pid"],
+                    item["mac"],
+                    item["action"],
+                    item["code"],
+                    item["message"],
+                    item["client_ip"],
+                    item.get("payload_json") or "",
+                    *[(item.get("payload") or {}).get(key, "") for key in payload_keys],
+                ]
+            )
+
+        output = BytesIO()
+        workbook.save(output)
+        output.seek(0)
+        return output
+
     def build_import_template(self) -> BytesIO:
         workbook = Workbook()
         sheet = workbook.active
@@ -222,12 +252,12 @@ class ExcelService:
         keys: list[str] = []
         for preferred in DISPLAY_PRIORITY:
             for item in rows:
-                for key in item["payload"]:
+                for key in item.get("payload") or {}:
                     if key.lower() == preferred and key not in seen:
                         seen.add(key)
                         keys.append(key)
         for item in rows:
-            for key in item["payload"]:
+            for key in item.get("payload") or {}:
                 if key not in seen:
                     seen.add(key)
                     keys.append(key)

@@ -197,6 +197,21 @@ def export_allocations():
     )
 
 
+@admin_bp.get("/api/admin/export-logs")
+@admin_login_required
+def export_logs():
+    excel_service = current_app.extensions["excel_service"]
+    action = request.args.get("action", "all").strip()
+    stream = excel_service.build_logs_workbook(action=action)
+    suffix = action if action in {"assigned", "reused", "exhausted"} else "all"
+    return send_file(
+        stream,
+        as_attachment=True,
+        download_name=f"request-logs-{suffix}.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
 @admin_bp.get("/api/admin/export-template")
 @admin_login_required
 def export_template():

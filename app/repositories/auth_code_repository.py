@@ -172,13 +172,7 @@ class AuthCodeRepository:
         limit: int = 20,
         action: str = "all",
     ) -> list[dict[str, Any]]:
-        clauses = []
-        params: list[Any] = []
-        if action in {"assigned", "reused", "exhausted"}:
-            clauses.append("action = ?")
-            params.append(action)
-
-        where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        where_sql, params = self._build_log_filters(action)
         with self.database.connection() as conn:
             rows = conn.execute(
                 f"""
@@ -189,6 +183,20 @@ class AuthCodeRepository:
                 LIMIT ?
                 """,
                 [*params, limit],
+            ).fetchall()
+        return [self._decode_log_row(row) for row in rows]
+
+    def list_logs_for_export(self, *, action: str = "all") -> list[dict[str, Any]]:
+        where_sql, params = self._build_log_filters(action)
+        with self.database.connection() as conn:
+            rows = conn.execute(
+                f"""
+                SELECT id AS log_id, pid, mac, code, payload_json, action, message, client_ip, created_at
+                FROM distribution_logs
+                {where_sql}
+                ORDER BY id DESC
+                """,
+                params,
             ).fetchall()
         return [self._decode_log_row(row) for row in rows]
 
@@ -381,6 +389,14 @@ class AuthCodeRepository:
     @staticmethod
     def _format_pid_did(pid: str, did: str) -> str:
         return f"{pid} / {did}"
+
+    @staticmethod
+    def _build_log_filters(action: str) -> tuple[str, list[Any]]:
+        params: list[Any] = []
+        if action in {"assigned", "reused", "exhausted"}:
+            params.append(action)
+            return "WHERE action = ?", params
+        return "", params
 
     @staticmethod
     def _decode_row(row) -> dict[str, Any]:

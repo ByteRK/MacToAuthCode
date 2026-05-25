@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import TestCase
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
 from app import create_app
 from app.config import Settings
@@ -196,6 +196,58 @@ class PlatformTestCase(TestCase):
             self.assertEqual(payload["data"]["action"], "reused")
             self.assertEqual(len(payload["data"]["items"]), 1)
             self.assertEqual(payload["data"]["items"][0]["action"], "reused")
+
+    def test_admin_logs_export_uses_action_filter(self):
+        with TemporaryDirectory() as temp_dir:
+            app = self.create_test_app(temp_dir)
+            repo = app.extensions["auth_code_repository"]
+            client = app.test_client()
+            client.post("/login", data={"username": "admin", "password": "password"})
+
+            repo.bulk_insert_codes(
+                [
+                    {
+                        "pid": "P1",
+                        "did": "DID-EXPORT-001",
+                        "license": "LIC-EXPORT-001",
+                        "code": "DID-EXPORT-001",
+                        "payload_json": "{\"did\": \"DID-EXPORT-001\", \"license\": \"LIC-EXPORT-001\"}",
+                        "payload_hash": "export-hash-001",
+                        "source_batch": "B1",
+                    },
+                ]
+            )
+
+            client.post(
+                "/api/device/authorize",
+                json={"mac": "AA-BB-CC-11-22-33", "pid": "P1"},
+            )
+            client.post(
+                "/api/device/authorize",
+                json={"mac": "AA-BB-CC-11-22-33", "pid": "P1"},
+            )
+            client.post(
+                "/api/device/authorize",
+                json={"mac": "AA-BB-CC-44-55-66", "pid": "PX"},
+            )
+
+            response = client.get("/api/admin/export-logs?action=reused")
+
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(
+                "request-logs-reused.xlsx",
+                response.headers["Content-Disposition"],
+            )
+
+            workbook = load_workbook(BytesIO(response.data))
+            sheet = workbook.active
+            rows = list(sheet.iter_rows(values_only=True))
+
+            self.assertEqual(rows[0][:8], ("时间", "PID", "MAC", "动作", "DID", "说明", "来源IP", "载荷JSON"))
+            self.assertEqual(len(rows), 2)
+            self.assertEqual(rows[1][1], "P1")
+            self.assertEqual(rows[1][3], "reused")
+            self.assertEqual(rows[1][4], "DID-EXPORT-001")
 
     def test_excel_import_supports_same_did_under_different_pid(self):
         with TemporaryDirectory() as temp_dir:
