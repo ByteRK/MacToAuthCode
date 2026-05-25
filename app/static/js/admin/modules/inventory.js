@@ -3,12 +3,26 @@ import { renderRows, renderTableMeta, byId } from "../core/dom.js";
 import { state } from "../core/state.js";
 import { switchPanel } from "./navigation.js";
 
+function renderInventorySummaryPagination(result) {
+  const totalPages = Math.max(1, Math.ceil(result.total / result.page_size));
+  state.inventorySummary.totalPages = totalPages;
+  byId("inventory-summary-page-indicator").textContent = `第 ${result.page} / ${totalPages} 页`;
+  byId("inventory-summary-prev-page").disabled = result.page <= 1;
+  byId("inventory-summary-next-page").disabled = result.page >= totalPages;
+}
+
 function renderCodePagination(result) {
   const totalPages = Math.max(1, Math.ceil(result.total / result.page_size));
   state.codeDetails.totalPages = totalPages;
   byId("codes-page-indicator").textContent = `第 ${result.page} / ${totalPages} 页`;
   byId("codes-prev-page").disabled = result.page <= 1;
   byId("codes-next-page").disabled = result.page >= totalPages;
+}
+
+function resetInventorySummaryPagination() {
+  byId("inventory-summary-page-indicator").textContent = "第 1 / 1 页";
+  byId("inventory-summary-prev-page").disabled = true;
+  byId("inventory-summary-next-page").disabled = true;
 }
 
 function resetCodeDetailsView() {
@@ -38,6 +52,7 @@ export async function loadInventorySummary() {
     "暂无库存数据"
   );
   renderTableMeta("inventory-summary-meta", payload.data, "PID 聚合库存");
+  renderInventorySummaryPagination(payload.data);
 }
 
 export async function loadCodeDetails() {
@@ -123,5 +138,23 @@ export function bindInventory() {
     await loadCodeDetails();
   });
 
+  byId("inventory-summary-prev-page").addEventListener("click", async () => {
+    if (state.inventorySummary.page <= 1) {
+      return;
+    }
+    state.inventorySummary.page -= 1;
+    await loadInventorySummary();
+  });
+
+  byId("inventory-summary-next-page").addEventListener("click", async () => {
+    const totalPages = state.inventorySummary.totalPages || 1;
+    if (state.inventorySummary.page >= totalPages) {
+      return;
+    }
+    state.inventorySummary.page += 1;
+    await loadInventorySummary();
+  });
+
+  resetInventorySummaryPagination();
   resetCodeDetailsView();
 }
