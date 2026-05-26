@@ -197,6 +197,7 @@ dist/AuthCodePlatform/
 - macOS 下 `package_mac.sh` 会优先使用 `uv` 管理 `.venv`；如果缺少 `pyinstaller`，脚本会自动安装依赖。
 - `config.json`、`data/` 可和打包产物放在同级目录，便于现场修改配置和持久化数据。
 - 如果现场启用了 Windows App Control、Defender Application Control 或其它白名单策略，未签名的 `AuthCodePlatform.exe` 可能需要预先放行或做代码签名。
+- Windows 打包产物中会额外附带 `README-Windows-运行说明.txt`，便于现场快速处理应用控制拦截。
 - 如果你仍在使用旧入口 `scripts/package.sh` / `scripts/package.ps1`，它们现在会转发到对应系统脚本。
 
 Windows 现场如果遇到“应用程序控制策略已阻止此文件”，可参考：
