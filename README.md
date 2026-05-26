@@ -10,6 +10,7 @@
 - 提供 Web 管理后台，可查看库存、最近分发日志和已分配明细。
 - 请求日志支持按动作筛选、`pid / mac` 关键词筛选、实时刷新，以及按当前筛选条件与时间范围导出 Excel。
 - 可选开启设备请求 IP 白名单，只有在名单内的来源 IP 才允许领取授权数据。
+- 白名单可在后台“访问控制”页面直接维护，配置持久化到 SQLite，不依赖外部配置文件保存运行时修改。
 - 使用 SQLite 本地存储，部署简单，无需额外数据库。
 
 ## 目录结构
@@ -67,11 +68,11 @@ uv pip install --python ./.venv/bin/python -r requirements.txt
 - `port`: 默认 `8080`
 - `admin_username` / `admin_password`: 后台登录账号
 - `data_dir`: SQLite 数据和导出文件目录
-- `request_ip_whitelist.enabled`: 是否开启设备请求 IP 白名单
-- `request_ip_whitelist.allowed_ips`: 允许访问设备授权接口的 IP 或 CIDR 网段列表
+- `request_ip_whitelist.enabled`: 设备请求 IP 白名单的首次启动默认值
+- `request_ip_whitelist.allowed_ips`: 白名单的首次启动默认值，支持 IP 或 CIDR 网段列表
 
 生产环境可通过环境变量覆盖同名配置项，例如 `AUTH_PLATFORM_PORT=9000`。
-白名单也可通过环境变量覆盖，例如 `AUTH_PLATFORM_REQUEST_IP_WHITELIST_ENABLED=true`、`AUTH_PLATFORM_REQUEST_IP_WHITELIST=192.168.1.10,192.168.1.0/24`。
+白名单也可通过环境变量覆盖，例如 `AUTH_PLATFORM_REQUEST_IP_WHITELIST_ENABLED=true`、`AUTH_PLATFORM_REQUEST_IP_WHITELIST=192.168.1.10,192.168.1.0/24`。这些值主要用于首次启动初始化；后台保存后的白名单会持久化到 SQLite 数据库中的运行时配置表。
 
 ### 3. 启动服务
 
@@ -109,8 +110,14 @@ chmod +x ./scripts/run_dev_mac.sh
 
 如果开启了请求 IP 白名单：
 
-- 只有 `request_ip_whitelist.allowed_ips` 中的 IP 或网段可以成功领取授权码
+- 只有当前白名单中的 IP 或网段可以成功领取授权码
 - 不在白名单内的请求会直接返回 `403`
+
+后台管理补充说明：
+
+- “访问控制”页面可以直接开启、关闭和编辑白名单
+- 白名单保存后立即生效，无需重启服务
+- 白名单数据存储在 SQLite 的运行时配置表中
 
 请求示例：
 

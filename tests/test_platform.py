@@ -151,6 +151,69 @@ class PlatformTestCase(TestCase):
             codes = repo.list_codes(status="all", search="DID-P1-001", page=1, page_size=10)
             self.assertEqual(codes["items"][0]["status"], "available")
 
+    def test_admin_request_ip_whitelist_api_reads_and_updates_database_config(self):
+        with TemporaryDirectory() as temp_dir:
+            settings = Settings(
+                app_name="Test",
+                host="127.0.0.1",
+                port=18080,
+                admin_username="admin",
+                admin_password="password",
+                secret_key="test-secret",
+                data_dir=Path(temp_dir),
+                request_ip_whitelist_enabled=True,
+                request_ip_whitelist=("192.168.1.0/24",),
+            )
+            app = create_app(settings=settings)
+            client = app.test_client()
+            client.post("/login", data={"username": "admin", "password": "password"})
+
+            initial_response = client.get("/api/admin/request-ip-whitelist")
+            initial_payload = initial_response.get_json()
+
+            self.assertEqual(initial_response.status_code, 200)
+            self.assertTrue(initial_payload["success"])
+            self.assertTrue(initial_payload["data"]["enabled"])
+            self.assertEqual(initial_payload["data"]["allowed_ips"], ["192.168.1.0/24"])
+
+            update_response = client.post(
+                "/api/admin/request-ip-whitelist",
+                json={
+                    "enabled": True,
+                    "allowed_ips": ["10.0.0.1", "10.0.0.0/24", "10.0.0.1"],
+                },
+            )
+            update_payload = update_response.get_json()
+
+            self.assertEqual(update_response.status_code, 200)
+            self.assertTrue(update_payload["success"])
+            self.assertEqual(
+                update_payload["data"]["allowed_ips"],
+                ["10.0.0.1", "10.0.0.0/24"],
+            )
+
+            reload_app = create_app(
+                settings=Settings(
+                    app_name="Test",
+                    host="127.0.0.1",
+                    port=18080,
+                    admin_username="admin",
+                    admin_password="password",
+                    secret_key="test-secret",
+                    data_dir=Path(temp_dir),
+                    request_ip_whitelist_enabled=False,
+                    request_ip_whitelist=(),
+                )
+            )
+            configuration_service = reload_app.extensions["configuration_service"]
+            self.assertEqual(
+                configuration_service.get_request_ip_whitelist_config(),
+                {
+                    "enabled": True,
+                    "allowed_ips": ["10.0.0.1", "10.0.0.0/24"],
+                },
+            )
+
     def test_excel_import_reports_all_invalid_rows_and_does_not_write_anything(self):
         with TemporaryDirectory() as temp_dir:
             app = self.create_test_app(temp_dir)

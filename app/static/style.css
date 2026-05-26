@@ -99,12 +99,14 @@ label > span:first-child {
 
 input,
 select,
+textarea,
 button {
   font: inherit;
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   min-height: 48px;
   padding: 12px 14px;
@@ -124,12 +126,14 @@ input::placeholder {
 }
 
 input:hover,
-select:hover {
+select:hover,
+textarea:hover {
   border-color: rgba(141, 63, 25, 0.2);
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   outline: none;
   border-color: var(--line-strong);
   box-shadow:
@@ -152,6 +156,11 @@ select {
 
 input[type="datetime-local"] {
   min-width: 188px;
+}
+
+textarea {
+  min-height: 180px;
+  resize: vertical;
 }
 
 input[readonly] {
@@ -553,6 +562,14 @@ th {
   border-radius: 0;
   background: transparent;
   box-shadow: none;
+}
+
+.access-switch-field {
+  justify-content: flex-start;
+}
+
+.access-control-hint {
+  margin-top: -4px;
 }
 
 .log-row-new td {

@@ -6,6 +6,7 @@ from app.config import Settings, load_settings
 from app.database import Database
 from app.repositories.auth_code_repository import AuthCodeRepository
 from app.services.auth_code_service import AuthCodeService
+from app.services.configuration_service import ConfigurationService
 from app.services.dashboard_service import DashboardService
 from app.services.excel_service import ExcelService
 from app.services.request_access_policy_service import RequestAccessPolicyService
@@ -31,6 +32,11 @@ def create_app(settings: Settings | None = None) -> Flask:
     auth_code_service = AuthCodeService(repository)
     dashboard_service = DashboardService(repository)
     request_access_policy_service = RequestAccessPolicyService(settings)
+    configuration_service = ConfigurationService(
+        database,
+        settings,
+        request_access_policy_service,
+    )
 
     app.extensions["database"] = database
     app.extensions["auth_code_repository"] = repository
@@ -38,6 +44,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     app.extensions["auth_code_service"] = auth_code_service
     app.extensions["dashboard_service"] = dashboard_service
     app.extensions["request_access_policy_service"] = request_access_policy_service
+    app.extensions["configuration_service"] = configuration_service
 
     app.register_blueprint(device_bp)
     app.register_blueprint(admin_bp)

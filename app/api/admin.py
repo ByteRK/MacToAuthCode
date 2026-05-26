@@ -254,6 +254,39 @@ def export_logs():
     )
 
 
+@admin_bp.get("/api/admin/request-ip-whitelist")
+@admin_login_required
+def request_ip_whitelist():
+    configuration_service = current_app.extensions["configuration_service"]
+    return jsonify(
+        {
+            "success": True,
+            "data": configuration_service.get_request_ip_whitelist_config(),
+        }
+    )
+
+
+@admin_bp.post("/api/admin/request-ip-whitelist")
+@admin_login_required
+def update_request_ip_whitelist():
+    payload = request.get_json(silent=True) or {}
+    enabled = bool(payload.get("enabled", False))
+    allowed_ips = payload.get("allowed_ips", [])
+    if not isinstance(allowed_ips, list):
+        return jsonify({"success": False, "message": "allowed_ips 必须是数组"}), 400
+
+    configuration_service = current_app.extensions["configuration_service"]
+    try:
+        data = configuration_service.update_request_ip_whitelist_config(
+            enabled=enabled,
+            allowed_ips=[str(item) for item in allowed_ips],
+        )
+    except ValueError as exc:
+        return jsonify({"success": False, "message": str(exc)}), 400
+
+    return jsonify({"success": True, "message": "白名单配置已更新", "data": data})
+
+
 @admin_bp.get("/api/admin/export-template")
 @admin_login_required
 def export_template():

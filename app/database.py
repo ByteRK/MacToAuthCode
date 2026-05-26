@@ -35,6 +35,12 @@ CREATE TABLE IF NOT EXISTS distribution_logs (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_auth_codes_pid_payload_hash ON auth_codes(pid, payload_hash);
 CREATE INDEX IF NOT EXISTS idx_auth_codes_did ON auth_codes(did);
 CREATE INDEX IF NOT EXISTS idx_auth_codes_pid_did ON auth_codes(pid, did);
