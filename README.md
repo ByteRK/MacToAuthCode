@@ -199,6 +199,22 @@ dist/AuthCodePlatform/
 - 如果现场启用了 Windows App Control、Defender Application Control 或其它白名单策略，未签名的 `AuthCodePlatform.exe` 可能需要预先放行或做代码签名。
 - 如果你仍在使用旧入口 `scripts/package.sh` / `scripts/package.ps1`，它们现在会转发到对应系统脚本。
 
+## GitHub Actions 发版
+
+仓库已包含按 tag 自动打包的工作流：[.github/workflows/build-on-tag.yml](/D:/HelloWorld/Ai/auth_codes/.github/workflows/build-on-tag.yml)
+
+触发方式：
+
+- 本地创建 tag：`git tag v1.0.0`
+- 推送 tag：`git push origin v1.0.0`
+
+触发后会自动：
+
+- 在 Windows、Linux、macOS 三个平台执行打包
+- 生成对应平台的压缩包
+- 上传到当前 workflow 的 Artifacts
+- 自动创建或更新同名 GitHub Release，并把打包产物挂到 Release Assets
+
 ## 测试
 
 ```powershell

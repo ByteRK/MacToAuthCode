@@ -1,0 +1,128 @@
+name: Build On Tag
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.label }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            label: Windows
+            setup_shell: pwsh
+            build_shell: pwsh
+            setup_command: |
+              python -m venv .venv
+              python -m pip --python .\.venv\Scripts\python.exe install --upgrade pip
+              python -m pip --python .\.venv\Scripts\python.exe install -r requirements.txt
+            build_command: .\scripts\package_win.ps1
+            archive_shell: pwsh
+            archive_command: |
+              $assetName = "AuthCodePlatform-${env:GITHUB_REF_NAME}-windows-x64.zip"
+              if (Test-Path $assetName) {
+                Remove-Item $assetName -Force
+              }
+              Compress-Archive -Path .\dist\AuthCodePlatform\* -DestinationPath $assetName -Force
+              "asset_name=$assetName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+          - os: ubuntu-latest
+            label: Linux
+            setup_shell: bash
+            build_shell: bash
+            setup_command: |
+              python3 -m venv .venv
+              python -m pip --python ./.venv/bin/python install --upgrade pip
+              python -m pip --python ./.venv/bin/python install -r requirements.txt
+            build_command: chmod +x ./scripts/package_linux.sh && ./scripts/package_linux.sh
+            archive_shell: bash
+            archive_command: |
+              asset_name="AuthCodePlatform-${GITHUB_REF_NAME}-linux-x64.tar.gz"
+              tar -C dist -czf "${asset_name}" AuthCodePlatform
+              echo "asset_name=${asset_name}" >> "${GITHUB_OUTPUT}"
+          - os: macos-latest
+            label: macOS
+            setup_shell: bash
+            build_shell: bash
+            setup_command: |
+              python -m pip install --upgrade pip
+              python -m pip install uv
+              uv venv .venv
+              uv pip install --python ./.venv/bin/python -r requirements.txt
+            build_command: chmod +x ./scripts/package_mac.sh && ./scripts/package_mac.sh
+            archive_shell: bash
+            archive_command: |
+              asset_name="AuthCodePlatform-${GITHUB_REF_NAME}-macos.tar.gz"
+              tar -C dist -czf "${asset_name}" AuthCodePlatform
+              echo "asset_name=${asset_name}" >> "${GITHUB_OUTPUT}"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Prepare Build Environment
+        shell: ${{ matrix.setup_shell }}
+        run: ${{ matrix.setup_command }}
+
+      - name: Build Package
+        shell: ${{ matrix.build_shell }}
+        run: ${{ matrix.build_command }}
+
+      - name: Archive Package
+        id: archive
+        shell: ${{ matrix.archive_shell }}
+        run: ${{ matrix.archive_command }}
+
+      - name: Upload Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.archive.outputs.asset_name }}
+          path: ${{ steps.archive.outputs.asset_name }}
+          if-no-files-found: error
+
+  release:
+    name: Publish Release Assets
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Download Build Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Or Update Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          if ! gh release view "${TAG_NAME}" >/dev/null 2>&1; then
+            gh release create "${TAG_NAME}" --title "${TAG_NAME}" --generate-notes
+          fi
+
+      - name: Upload Release Assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          assets=()
+          while IFS= read -r -d '' file; do
+            assets+=("${file}")
+          done < <(find artifacts -type f -print0)
+          if [ "${#assets[@]}" -eq 0 ]; then
+            echo "No release assets found under artifacts/"
+            exit 1
+          fi
+          gh release upload "${TAG_NAME}" "${assets[@]}" --clobber
