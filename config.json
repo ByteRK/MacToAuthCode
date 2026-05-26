@@ -5,5 +5,12 @@
   "admin_username": "admin",
   "admin_password": "ChangeMe123!",
   "secret_key": "replace-with-a-random-string",
-  "data_dir": "data"
+  "data_dir": "data",
+  "request_ip_whitelist": {
+    "enabled": false,
+    "allowed_ips": [
+      "127.0.0.1",
+      "192.168.1.0/24"
+    ]
+  }
 }

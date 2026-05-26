@@ -9,6 +9,7 @@
 - 支持 Excel 导入结构化授权数据（如 `did`、`license` 等），支持导出已分配数据与请求日志。
 - 提供 Web 管理后台，可查看库存、最近分发日志和已分配明细。
 - 请求日志支持按动作筛选、`pid / mac` 关键词筛选、实时刷新，以及按当前筛选条件与时间范围导出 Excel。
+- 可选开启设备请求 IP 白名单，只有在名单内的来源 IP 才允许领取授权数据。
 - 使用 SQLite 本地存储，部署简单，无需额外数据库。
 
 ## 目录结构
@@ -66,8 +67,11 @@ uv pip install --python ./.venv/bin/python -r requirements.txt
 - `port`: 默认 `8080`
 - `admin_username` / `admin_password`: 后台登录账号
 - `data_dir`: SQLite 数据和导出文件目录
+- `request_ip_whitelist.enabled`: 是否开启设备请求 IP 白名单
+- `request_ip_whitelist.allowed_ips`: 允许访问设备授权接口的 IP 或 CIDR 网段列表
 
 生产环境可通过环境变量覆盖同名配置项，例如 `AUTH_PLATFORM_PORT=9000`。
+白名单也可通过环境变量覆盖，例如 `AUTH_PLATFORM_REQUEST_IP_WHITELIST_ENABLED=true`、`AUTH_PLATFORM_REQUEST_IP_WHITELIST=192.168.1.10,192.168.1.0/24`。
 
 ### 3. 启动服务
 
@@ -102,6 +106,11 @@ chmod +x ./scripts/run_dev_mac.sh
 - 后台地址: `http://<服务器IP>:8080/login`
 - 健康检查: `http://<服务器IP>:8080/healthz`
 - 设备接口: `POST http://<服务器IP>:8080/api/device/authorize`
+
+如果开启了请求 IP 白名单：
+
+- 只有 `request_ip_whitelist.allowed_ips` 中的 IP 或网段可以成功领取授权码
+- 不在白名单内的请求会直接返回 `403`
 
 请求示例：
 

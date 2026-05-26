@@ -1,3 +1,4 @@
+import os
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -6,7 +7,7 @@ from unittest import TestCase
 from openpyxl import Workbook, load_workbook
 
 from app import create_app
-from app.config import Settings
+from app.config import Settings, load_settings
 
 
 class PlatformTestCase(TestCase):
@@ -21,6 +22,43 @@ class PlatformTestCase(TestCase):
             data_dir=Path(temp_dir),
         )
         return create_app(settings=settings)
+
+    def test_load_settings_supports_request_ip_whitelist_config(self):
+        with TemporaryDirectory() as temp_dir:
+            config_path = Path(temp_dir) / "config.json"
+            config_path.write_text(
+                """
+                {
+                  "app_name": "Test",
+                  "host": "0.0.0.0",
+                  "port": 8080,
+                  "admin_username": "admin",
+                  "admin_password": "password",
+                  "secret_key": "secret",
+                  "data_dir": "data",
+                  "request_ip_whitelist": {
+                    "enabled": true,
+                    "allowed_ips": ["192.168.1.10", "192.168.1.0/24"]
+                  }
+                }
+                """,
+                encoding="utf-8",
+            )
+            original_config_file = os.environ.get("AUTH_PLATFORM_CONFIG_FILE")
+            try:
+                os.environ["AUTH_PLATFORM_CONFIG_FILE"] = str(config_path)
+                settings = load_settings()
+            finally:
+                if original_config_file is None:
+                    os.environ.pop("AUTH_PLATFORM_CONFIG_FILE", None)
+                else:
+                    os.environ["AUTH_PLATFORM_CONFIG_FILE"] = original_config_file
+
+            self.assertTrue(settings.request_ip_whitelist_enabled)
+            self.assertEqual(
+                settings.request_ip_whitelist,
+                ("192.168.1.10", "192.168.1.0/24"),
+            )
 
     def test_distribution_is_scoped_by_pid(self):
         with TemporaryDirectory() as temp_dir:
@@ -68,6 +106,50 @@ class PlatformTestCase(TestCase):
             self.assertEqual(first.get_json()["data"]["payload"]["license"], "P1-001")
             self.assertEqual(second.get_json()["data"]["mode"], "reused")
             self.assertEqual(third.get_json()["data"]["display_code"], "DID-P2-001")
+
+    def test_device_authorize_rejects_requests_outside_ip_whitelist(self):
+        with TemporaryDirectory() as temp_dir:
+            settings = Settings(
+                app_name="Test",
+                host="127.0.0.1",
+                port=18080,
+                admin_username="admin",
+                admin_password="password",
+                secret_key="test-secret",
+                data_dir=Path(temp_dir),
+                request_ip_whitelist_enabled=True,
+                request_ip_whitelist=("192.168.1.0/24",),
+            )
+            app = create_app(settings=settings)
+            repo = app.extensions["auth_code_repository"]
+            repo.bulk_insert_codes(
+                [
+                    {
+                        "pid": "P1",
+                        "did": "DID-P1-001",
+                        "license": "P1-001",
+                        "code": "DID-P1-001",
+                        "payload_json": "{\"did\": \"DID-P1-001\", \"license\": \"P1-001\"}",
+                        "payload_hash": "hash-p1",
+                        "source_batch": "B1",
+                    },
+                ]
+            )
+            client = app.test_client()
+
+            response = client.post(
+                "/api/device/authorize",
+                json={"mac": "AA-BB-CC-11-22-33", "pid": "P1"},
+                environ_overrides={"REMOTE_ADDR": "10.0.0.2"},
+            )
+            payload = response.get_json()
+
+            self.assertEqual(response.status_code, 403)
+            self.assertFalse(payload["success"])
+            self.assertIn("IP 不在白名单", payload["message"])
+
+            codes = repo.list_codes(status="all", search="DID-P1-001", page=1, page_size=10)
+            self.assertEqual(codes["items"][0]["status"], "available")
 
     def test_excel_import_reports_all_invalid_rows_and_does_not_write_anything(self):
         with TemporaryDirectory() as temp_dir:

@@ -2,7 +2,7 @@ import json
 import os
 import secrets
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -10,6 +10,22 @@ def runtime_base_dir() -> Path:
     if getattr(sys, "frozen", False):
         return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parent.parent
+
+
+def _as_bool(value: object, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _as_string_list(value: object) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    return [item.strip() for item in str(value).split(",") if item.strip()]
 
 
 @dataclass(slots=True)
@@ -21,6 +37,8 @@ class Settings:
     admin_password: str
     secret_key: str
     data_dir: Path
+    request_ip_whitelist_enabled: bool = False
+    request_ip_whitelist: tuple[str, ...] = field(default_factory=tuple)
 
     @property
     def db_path(self) -> Path:
@@ -38,9 +56,12 @@ class Settings:
 def load_settings() -> Settings:
     base_dir = runtime_base_dir()
     config_path = Path(os.getenv("AUTH_PLATFORM_CONFIG_FILE", base_dir / "config.json"))
-    file_config: dict[str, str | int] = {}
+    file_config: dict[str, object] = {}
     if config_path.exists():
         file_config = json.loads(config_path.read_text(encoding="utf-8"))
+    request_policy_config = file_config.get("request_ip_whitelist", {})
+    if not isinstance(request_policy_config, dict):
+        request_policy_config = {}
 
     return Settings(
         app_name=str(
@@ -83,6 +104,20 @@ def load_settings() -> Settings:
             os.getenv(
                 "AUTH_PLATFORM_DATA_DIR",
                 str(file_config.get("data_dir", base_dir / "data")),
+            )
+        ),
+        request_ip_whitelist_enabled=_as_bool(
+            os.getenv(
+                "AUTH_PLATFORM_REQUEST_IP_WHITELIST_ENABLED",
+                request_policy_config.get("enabled", False),
+            )
+        ),
+        request_ip_whitelist=tuple(
+            _as_string_list(
+                os.getenv(
+                    "AUTH_PLATFORM_REQUEST_IP_WHITELIST",
+                    request_policy_config.get("allowed_ips", []),
+                )
             )
         ),
     )
