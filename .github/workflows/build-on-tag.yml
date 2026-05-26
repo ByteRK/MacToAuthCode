@@ -8,6 +8,9 @@ on:
 permissions:
   contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   build:
     name: Build ${{ matrix.label }}
@@ -16,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: windows-latest
+          - os: windows-2025
             label: Windows
             platform: windows
           - os: ubuntu-latest
@@ -128,21 +131,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG_NAME: ${{ github.ref_name }}
         run: |
-          if ! gh release view "${TAG_NAME}" >/dev/null 2>&1; then
-            gh release create "${TAG_NAME}" --title "${TAG_NAME}" --generate-notes
-          fi
-
-      - name: Upload Release Assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG_NAME: ${{ github.ref_name }}
-        run: |
           assets=()
           while IFS= read -r -d '' file; do
             assets+=("${file}")
-          done < <(find artifacts -type f -print0)
+          done < <(find artifacts -type f \( -name '*.zip' -o -name '*.tar.gz' \) -print0)
+
           if [ "${#assets[@]}" -eq 0 ]; then
             echo "No release assets found under artifacts/"
             exit 1
           fi
-          gh release upload "${TAG_NAME}" "${assets[@]}" --clobber
+
+          echo "Resolved release assets:"
+          printf ' - %s\n' "${assets[@]}"
+
+          if gh release view "${TAG_NAME}" >/dev/null 2>&1; then
+            gh release upload "${TAG_NAME}" "${assets[@]}" --clobber
+          else
+            gh release create "${TAG_NAME}" "${assets[@]}" --title "${TAG_NAME}" --generate-notes
+          fi
