@@ -245,7 +245,7 @@ def export_logs():
         start_at=start_at,
         end_at=end_at,
     )
-    suffix = action if action in {"assigned", "reused", "exhausted"} else "all"
+    suffix = action if action in {"assigned", "reused", "exhausted", "denied"} else "all"
     return send_file(
         stream,
         as_attachment=True,

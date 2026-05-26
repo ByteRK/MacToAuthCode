@@ -150,6 +150,12 @@ class PlatformTestCase(TestCase):
 
             codes = repo.list_codes(status="all", search="DID-P1-001", page=1, page_size=10)
             self.assertEqual(codes["items"][0]["status"], "available")
+            denied_logs = repo.fetch_recent_logs(limit=20, action="denied")
+            self.assertEqual(len(denied_logs), 1)
+            self.assertEqual(denied_logs[0]["pid"], "P1")
+            self.assertEqual(denied_logs[0]["mac"], "AA-BB-CC-11-22-33")
+            self.assertEqual(denied_logs[0]["client_ip"], "10.0.0.2")
+            self.assertEqual(denied_logs[0]["action"], "denied")
 
     def test_admin_request_ip_whitelist_api_reads_and_updates_database_config(self):
         with TemporaryDirectory() as temp_dir:
@@ -341,6 +347,40 @@ class PlatformTestCase(TestCase):
             self.assertEqual(payload["data"]["action"], "reused")
             self.assertEqual(len(payload["data"]["items"]), 1)
             self.assertEqual(payload["data"]["items"][0]["action"], "reused")
+
+    def test_admin_logs_api_supports_denied_action_filter(self):
+        with TemporaryDirectory() as temp_dir:
+            settings = Settings(
+                app_name="Test",
+                host="127.0.0.1",
+                port=18080,
+                admin_username="admin",
+                admin_password="password",
+                secret_key="test-secret",
+                data_dir=Path(temp_dir),
+                request_ip_whitelist_enabled=True,
+                request_ip_whitelist=("192.168.1.0/24",),
+            )
+            app = create_app(settings=settings)
+            client = app.test_client()
+            client.post("/login", data={"username": "admin", "password": "password"})
+
+            response = client.post(
+                "/api/device/authorize",
+                json={"mac": "AA-BB-CC-11-22-33", "pid": "P1"},
+                environ_overrides={"REMOTE_ADDR": "10.0.0.2"},
+            )
+            self.assertEqual(response.status_code, 403)
+
+            logs_response = client.get("/api/admin/logs?limit=20&action=denied")
+            payload = logs_response.get_json()
+
+            self.assertEqual(logs_response.status_code, 200)
+            self.assertTrue(payload["success"])
+            self.assertEqual(payload["data"]["action"], "denied")
+            self.assertEqual(len(payload["data"]["items"]), 1)
+            self.assertEqual(payload["data"]["items"][0]["action"], "denied")
+            self.assertEqual(payload["data"]["items"][0]["client_ip"], "10.0.0.2")
 
     def test_admin_logs_api_supports_pid_or_mac_keyword_filter(self):
         with TemporaryDirectory() as temp_dir:

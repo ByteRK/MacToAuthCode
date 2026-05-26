@@ -418,7 +418,7 @@ class AuthCodeRepository:
     ) -> tuple[str, list[Any]]:
         clauses: list[str] = []
         params: list[Any] = []
-        if action in {"assigned", "reused", "exhausted"}:
+        if action in {"assigned", "reused", "exhausted", "denied"}:
             clauses.append("action = ?")
             params.append(action)
         if search.strip():
