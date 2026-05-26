@@ -2,6 +2,14 @@ import { fetchJson } from "../core/api.js";
 import { renderRows, byId } from "../core/dom.js";
 import { state } from "../core/state.js";
 
+const LOG_ACTION_LABELS = {
+  all: "全部动作",
+  assigned: "新分配",
+  reused: "重复返回",
+  exhausted: "库存不足",
+  denied: "白名单拒绝",
+};
+
 function resetLogHighlights() {
   state.logs.hasLoaded = false;
   state.logs.seenLogIds = [];
@@ -58,14 +66,18 @@ function validateExportRange() {
 }
 
 function renderLogs(items, highlightedIds) {
+  const displayItems = items.map((item) => ({
+    ...item,
+    action_label: LOG_ACTION_LABELS[item.action] || item.action || "-",
+  }));
   renderRows(
     "logs-body",
-    items,
+    displayItems,
     [
       { key: "created_at" },
       { key: "pid" },
       { key: "mac" },
-      { key: "action" },
+      { key: "action_label" },
       { key: "code" },
       { key: "payload_preview", type: "payload", title: "请求日志载荷" },
       { key: "message" },
@@ -125,7 +137,7 @@ export async function loadLogs() {
   state.logs.seenLogIds = currentIds;
   state.logs.hasLoaded = true;
   renderLogs(items, highlightedIds);
-  const actionLabel = state.logs.action === "all" ? "全部动作" : state.logs.action;
+  const actionLabel = LOG_ACTION_LABELS[state.logs.action] || state.logs.action;
   const searchLabel = state.logs.search ? `，关键词“${state.logs.search}”` : "";
   setLogsStatus(
     `最近刷新：${formatRefreshTime(new Date())}，显示 ${actionLabel}${searchLabel} 下最近 ${payload.data.limit} 条请求日志`
