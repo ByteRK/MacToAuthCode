@@ -9,7 +9,6 @@
 - 支持 Excel 导入结构化授权数据（如 `did`、`license` 等），支持导出已分配数据与请求日志。
 - 提供 Web 管理后台，可查看库存、最近分发日志和已分配明细。
 - 请求日志支持按动作筛选、`pid / mac` 关键词筛选、实时刷新，以及按当前筛选条件与时间范围导出 Excel。
-- 可选开启内置 DNS 服务，监听局域网 DNS 请求，并将指定域名解析到当前设备。
 - 使用 SQLite 本地存储，部署简单，无需额外数据库。
 
 ## 目录结构
@@ -67,30 +66,8 @@ uv pip install --python ./.venv/bin/python -r requirements.txt
 - `port`: 默认 `8080`
 - `admin_username` / `admin_password`: 后台登录账号
 - `data_dir`: SQLite 数据和导出文件目录
-- `dns_server.enabled`: 是否开启内置 DNS 服务
-- `dns_server.host` / `dns_server.port`: DNS 监听地址与端口，默认 `0.0.0.0:53`
-- `dns_server.target_ip`: 指定要返回给域名的当前设备 IP；留空时自动探测
-- `dns_server.upstream_host` / `dns_server.upstream_port`: 非重写域名转发到的上游 DNS
-- `dns_server.override_domains`: 需要直接解析到当前设备的域名列表
 
 生产环境可通过环境变量覆盖同名配置项，例如 `AUTH_PLATFORM_PORT=9000`。
-DNS 相关环境变量也可覆盖，例如 `AUTH_PLATFORM_DNS_ENABLED=true`、`AUTH_PLATFORM_DNS_OVERRIDE_DOMAINS=license.local,portal.local`。
-
-示例：
-
-```json
-{
-  "dns_server": {
-    "enabled": true,
-    "host": "0.0.0.0",
-    "port": 53,
-    "target_ip": "",
-    "upstream_host": "223.5.5.5",
-    "upstream_port": 53,
-    "override_domains": ["license.local", "portal.local"]
-  }
-}
-```
 
 ### 3. 启动服务
 
@@ -125,13 +102,6 @@ chmod +x ./scripts/run_dev_mac.sh
 - 后台地址: `http://<服务器IP>:8080/login`
 - 健康检查: `http://<服务器IP>:8080/healthz`
 - 设备接口: `POST http://<服务器IP>:8080/api/device/authorize`
-
-如果开启了 DNS 服务：
-
-- 局域网设备可将本机 IP 配置为 DNS 服务器
-- `override_domains` 中的域名会直接解析到当前设备
-- 其它域名会转发到 `dns_server.upstream_host`
-- 监听 `53` 端口通常需要管理员或 root 权限
 
 请求示例：
 

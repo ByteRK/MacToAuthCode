@@ -1,5 +1,3 @@
-import os
-import socket
 from io import BytesIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -8,7 +6,7 @@ from unittest import TestCase
 from openpyxl import Workbook, load_workbook
 
 from app import create_app
-from app.config import Settings, load_settings
+from app.config import Settings
 
 
 class PlatformTestCase(TestCase):
@@ -23,15 +21,6 @@ class PlatformTestCase(TestCase):
             data_dir=Path(temp_dir),
         )
         return create_app(settings=settings)
-
-    @staticmethod
-    def build_dns_query(domain: str) -> bytes:
-        header = b"\x12\x34\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00"
-        labels = b"".join(
-            len(label).to_bytes(1, "big") + label.encode("ascii")
-            for label in domain.split(".")
-        )
-        return header + labels + b"\x00\x00\x01\x00\x01"
 
     def test_distribution_is_scoped_by_pid(self):
         with TemporaryDirectory() as temp_dir:
@@ -79,87 +68,6 @@ class PlatformTestCase(TestCase):
             self.assertEqual(first.get_json()["data"]["payload"]["license"], "P1-001")
             self.assertEqual(second.get_json()["data"]["mode"], "reused")
             self.assertEqual(third.get_json()["data"]["display_code"], "DID-P2-001")
-
-    def test_load_settings_supports_dns_server_config(self):
-        with TemporaryDirectory() as temp_dir:
-            config_path = Path(temp_dir) / "config.json"
-            config_path.write_text(
-                """
-                {
-                  "app_name": "Test",
-                  "host": "0.0.0.0",
-                  "port": 8080,
-                  "admin_username": "admin",
-                  "admin_password": "password",
-                  "secret_key": "secret",
-                  "data_dir": "data",
-                  "dns_server": {
-                    "enabled": true,
-                    "host": "0.0.0.0",
-                    "port": 5300,
-                    "target_ip": "192.168.10.20",
-                    "upstream_host": "1.1.1.1",
-                    "upstream_port": 53,
-                    "override_domains": ["license.local", "portal.local"]
-                  }
-                }
-                """,
-                encoding="utf-8",
-            )
-            original_config_file = os.environ.get("AUTH_PLATFORM_CONFIG_FILE")
-            try:
-                os.environ["AUTH_PLATFORM_CONFIG_FILE"] = str(config_path)
-                settings = load_settings()
-            finally:
-                if original_config_file is None:
-                    os.environ.pop("AUTH_PLATFORM_CONFIG_FILE", None)
-                else:
-                    os.environ["AUTH_PLATFORM_CONFIG_FILE"] = original_config_file
-
-            self.assertTrue(settings.dns_enabled)
-            self.assertEqual(settings.dns_port, 5300)
-            self.assertEqual(settings.dns_target_ip, "192.168.10.20")
-            self.assertEqual(settings.dns_upstream_host, "1.1.1.1")
-            self.assertEqual(
-                settings.dns_override_domains,
-                ("license.local", "portal.local"),
-            )
-
-    def test_dns_server_resolves_override_domain_to_current_device(self):
-        with TemporaryDirectory() as temp_dir:
-            settings = Settings(
-                app_name="Test",
-                host="127.0.0.1",
-                port=18080,
-                admin_username="admin",
-                admin_password="password",
-                secret_key="test-secret",
-                data_dir=Path(temp_dir),
-                dns_enabled=True,
-                dns_host="127.0.0.1",
-                dns_port=0,
-                dns_target_ip="192.168.10.20",
-                dns_upstream_host="127.0.0.1",
-                dns_upstream_port=5353,
-                dns_override_domains=("license.local",),
-            )
-            app = create_app(settings=settings)
-            dns_service = app.extensions["dns_server_service"]
-            dns_service.start()
-
-            try:
-                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as client:
-                    client.settimeout(2.0)
-                    client.sendto(
-                        self.build_dns_query("license.local"),
-                        ("127.0.0.1", dns_service.listen_port),
-                    )
-                    response, _ = client.recvfrom(512)
-            finally:
-                dns_service.stop()
-
-            self.assertEqual(response[:2], b"\x12\x34")
-            self.assertEqual(socket.inet_ntoa(response[-4:]), "192.168.10.20")
 
     def test_excel_import_reports_all_invalid_rows_and_does_not_write_anything(self):
         with TemporaryDirectory() as temp_dir:
