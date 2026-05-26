@@ -18,50 +18,13 @@ jobs:
         include:
           - os: windows-latest
             label: Windows
-            setup_shell: pwsh
-            build_shell: pwsh
-            setup_command: |
-              python -m venv .venv
-              python -m pip --python .\.venv\Scripts\python.exe install --upgrade pip
-              python -m pip --python .\.venv\Scripts\python.exe install -r requirements.txt
-            build_command: .\scripts\package_win.ps1
-            archive_shell: pwsh
-            archive_command: |
-              $assetName = "AuthCodePlatform-${env:GITHUB_REF_NAME}-windows-x64.zip"
-              if (Test-Path $assetName) {
-                Remove-Item $assetName -Force
-              }
-              Compress-Archive -Path .\dist\AuthCodePlatform\* -DestinationPath $assetName -Force
-              "asset_name=$assetName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+            platform: windows
           - os: ubuntu-latest
             label: Linux
-            setup_shell: bash
-            build_shell: bash
-            setup_command: |
-              python3 -m venv .venv
-              python -m pip --python ./.venv/bin/python install --upgrade pip
-              python -m pip --python ./.venv/bin/python install -r requirements.txt
-            build_command: chmod +x ./scripts/package_linux.sh && ./scripts/package_linux.sh
-            archive_shell: bash
-            archive_command: |
-              asset_name="AuthCodePlatform-${GITHUB_REF_NAME}-linux-x64.tar.gz"
-              tar -C dist -czf "${asset_name}" AuthCodePlatform
-              echo "asset_name=${asset_name}" >> "${GITHUB_OUTPUT}"
+            platform: linux
           - os: macos-latest
             label: macOS
-            setup_shell: bash
-            build_shell: bash
-            setup_command: |
-              python -m pip install --upgrade pip
-              python -m pip install uv
-              uv venv .venv
-              uv pip install --python ./.venv/bin/python -r requirements.txt
-            build_command: chmod +x ./scripts/package_mac.sh && ./scripts/package_mac.sh
-            archive_shell: bash
-            archive_command: |
-              asset_name="AuthCodePlatform-${GITHUB_REF_NAME}-macos.tar.gz"
-              tar -C dist -czf "${asset_name}" AuthCodePlatform
-              echo "asset_name=${asset_name}" >> "${GITHUB_OUTPUT}"
+            platform: macos
 
     steps:
       - name: Checkout
@@ -72,24 +35,81 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Prepare Build Environment
-        shell: ${{ matrix.setup_shell }}
-        run: ${{ matrix.setup_command }}
+      - name: Prepare Build Environment (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          python -m pip --python .\.venv\Scripts\python.exe install --upgrade pip
+          python -m pip --python .\.venv\Scripts\python.exe install -r requirements.txt
 
-      - name: Build Package
-        shell: ${{ matrix.build_shell }}
-        run: ${{ matrix.build_command }}
+      - name: Prepare Build Environment (Linux)
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          python3 -m venv .venv
+          python -m pip --python ./.venv/bin/python install --upgrade pip
+          python -m pip --python ./.venv/bin/python install -r requirements.txt
 
-      - name: Archive Package
+      - name: Prepare Build Environment (macOS)
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install uv
+          uv venv .venv
+          uv pip install --python ./.venv/bin/python -r requirements.txt
+
+      - name: Build Package (Windows)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: .\scripts\package_win.ps1
+
+      - name: Build Package (Linux)
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: chmod +x ./scripts/package_linux.sh && ./scripts/package_linux.sh
+
+      - name: Build Package (macOS)
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: chmod +x ./scripts/package_mac.sh && ./scripts/package_mac.sh
+
+      - name: Archive Package (Windows)
         id: archive
-        shell: ${{ matrix.archive_shell }}
-        run: ${{ matrix.archive_command }}
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $assetName = "AuthCodePlatform-${env:GITHUB_REF_NAME}-windows-x64.zip"
+          if (Test-Path $assetName) {
+            Remove-Item $assetName -Force
+          }
+          Compress-Archive -Path .\dist\AuthCodePlatform\* -DestinationPath $assetName -Force
+          "asset_name=$assetName" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Archive Package (Linux)
+        id: archive-linux
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          asset_name="AuthCodePlatform-${GITHUB_REF_NAME}-linux-x64.tar.gz"
+          tar -C dist -czf "${asset_name}" AuthCodePlatform
+          echo "asset_name=${asset_name}" >> "${GITHUB_OUTPUT}"
+
+      - name: Archive Package (macOS)
+        id: archive-macos
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          asset_name="AuthCodePlatform-${GITHUB_REF_NAME}-macos.tar.gz"
+          tar -C dist -czf "${asset_name}" AuthCodePlatform
+          echo "asset_name=${asset_name}" >> "${GITHUB_OUTPUT}"
 
       - name: Upload Workflow Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.archive.outputs.asset_name }}
-          path: ${{ steps.archive.outputs.asset_name }}
+          name: ${{ steps.archive.outputs.asset_name || steps.archive-linux.outputs.asset_name || steps.archive-macos.outputs.asset_name }}
+          path: ${{ steps.archive.outputs.asset_name || steps.archive-linux.outputs.asset_name || steps.archive-macos.outputs.asset_name }}
           if-no-files-found: error
 
   release:
