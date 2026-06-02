@@ -1,5 +1,6 @@
 import json
 import os
+import socket
 from pathlib import Path
 from typing import TextIO
 
@@ -16,6 +17,10 @@ except ImportError:  # pragma: no cover - POSIX only
 
 class SingleInstanceError(RuntimeError):
     """Raised when another instance is already holding the same app lock."""
+
+
+class PortUnavailableError(RuntimeError):
+    """Raised when the configured listening port is already occupied."""
 
 
 class SingleInstanceService:
@@ -56,6 +61,18 @@ class SingleInstanceService:
     @staticmethod
     def build_lock_path(base_dir: Path, port: int) -> Path:
         return base_dir / f"instance-{port}.lock"
+
+    @staticmethod
+    def ensure_port_available(host: str, port: int) -> None:
+        address = host or "0.0.0.0"
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            try:
+                sock.bind((address, port))
+            except OSError as exc:
+                raise PortUnavailableError(
+                    f"port {port} is already in use on host {address}"
+                ) from exc
 
     @staticmethod
     def _lock_handle(handle: TextIO) -> None:

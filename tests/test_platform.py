@@ -1,5 +1,6 @@
 import os
 import shutil
+import socket
 import uuid
 from io import BytesIO
 from pathlib import Path
@@ -10,6 +11,7 @@ from openpyxl import Workbook, load_workbook
 from app import create_app
 from app.config import Settings, load_settings
 from app.services.single_instance_service import (
+    PortUnavailableError,
     SingleInstanceError,
     SingleInstanceService,
 )
@@ -102,6 +104,20 @@ class PlatformTestCase(TestCase):
             with first:
                 with self.assertRaises(SingleInstanceError):
                     second.acquire()
+
+    def test_port_check_allows_available_port(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind(("127.0.0.1", 0))
+            port = sock.getsockname()[1]
+        SingleInstanceService.ensure_port_available("127.0.0.1", port)
+
+    def test_port_check_rejects_occupied_port(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.bind(("127.0.0.1", 0))
+            sock.listen()
+            port = sock.getsockname()[1]
+            with self.assertRaises(PortUnavailableError):
+                SingleInstanceService.ensure_port_available("127.0.0.1", port)
 
     def test_distribution_is_scoped_by_pid(self):
         with TemporaryDirectory() as temp_dir:

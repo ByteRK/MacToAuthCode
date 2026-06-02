@@ -3,6 +3,7 @@ from waitress import serve
 from app import create_app
 from app.config import load_settings
 from app.services.single_instance_service import (
+    PortUnavailableError,
     SingleInstanceError,
     SingleInstanceService,
 )
@@ -13,15 +14,26 @@ def main() -> None:
     lock_path = SingleInstanceService.build_lock_path(settings.data_dir, settings.port)
     try:
         with SingleInstanceService(lock_path):
+            SingleInstanceService.ensure_port_available(settings.host, settings.port)
             app = create_app(settings=settings)
             print(
                 f"{settings.app_name} running on http://{settings.host}:{settings.port}",
                 flush=True,
             )
+            print(
+                f"请勿重复启动 {settings.app_name}；如需同时运行多个实例，请为每个实例配置不同端口。",
+                flush=True,
+            )
             serve(app, host=settings.host, port=settings.port)
     except SingleInstanceError:
         print(
-            f"{settings.app_name} 已在端口 {settings.port} 运行，若需同时运行请改用不同端口。",
+            f"{settings.app_name} 检测到重复启动：端口 {settings.port} 已有本程序实例运行。请不要重复启动；若需同时运行请改用不同端口。",
+            flush=True,
+        )
+        raise SystemExit(1)
+    except PortUnavailableError:
+        print(
+            f"{settings.app_name} 无法启动：端口 {settings.port} 已被其他程序占用。请先释放该端口，或改用不同端口后再启动。",
             flush=True,
         )
         raise SystemExit(1)
