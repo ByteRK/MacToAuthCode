@@ -1,4 +1,5 @@
 import os
+import socket
 
 from waitress import serve
 
@@ -9,6 +10,30 @@ from app.services.single_instance_service import (
     SingleInstanceError,
     SingleInstanceService,
 )
+
+
+def build_access_urls(host: str, port: int) -> list[str]:
+    if host != "0.0.0.0":
+        return [f"http://{host}:{port}"]
+
+    addresses = ["127.0.0.1"]
+    try:
+        _, _, resolved_addresses = socket.gethostbyname_ex(socket.gethostname())
+    except OSError:
+        resolved_addresses = []
+
+    for address in sorted(set(resolved_addresses)):
+        if address and address != "127.0.0.1":
+            addresses.append(address)
+
+    return [f"http://{address}:{port}" for address in addresses]
+
+
+def format_startup_message(app_name: str, host: str, port: int) -> str:
+    urls = build_access_urls(host, port)
+    if len(urls) == 1:
+        return f"{app_name}\nrunning on {urls[0]}"
+    return f"{app_name}\n可通过以下地址访问：\n" + "\n".join(urls)
 
 
 def exit_with_message(message: str, exit_code: int = 1) -> None:
@@ -43,13 +68,13 @@ def main() -> None:
             SingleInstanceService.ensure_port_available(settings.host, settings.port)
             app = create_app(settings=settings)
             print(
-                f"{settings.app_name}\nrunning on http://{settings.host}:{settings.port}",
+                format_startup_message(
+                    settings.app_name,
+                    settings.host,
+                    settings.port,
+                ),
                 flush=True,
             )
-            # print(
-            #     f"请勿重复启动 {settings.app_name}；如需同时运行多个实例，请为每个实例配置不同端口。",
-            #     flush=True,
-            # )
             serve(app, host=settings.host, port=settings.port)
     except SingleInstanceError:
         exit_with_message(

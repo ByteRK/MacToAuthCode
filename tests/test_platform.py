@@ -162,6 +162,43 @@ class PlatformTestCase(TestCase):
         self.assertIn("按回车键退出...", output.getvalue())
         mock_input.assert_not_called()
 
+    def test_build_access_urls_returns_bound_host_when_not_wildcard(self):
+        self.assertEqual(
+            app_main.build_access_urls("192.168.1.20", 8080),
+            ["http://192.168.1.20:8080"],
+        )
+
+    def test_build_access_urls_expands_wildcard_host(self):
+        with (
+            patch("socket.gethostname", return_value="test-host"),
+            patch(
+                "socket.gethostbyname_ex",
+                return_value=("test-host", [], ["192.168.1.50", "127.0.0.1", "192.168.1.20"]),
+            ),
+        ):
+            urls = app_main.build_access_urls("0.0.0.0", 8080)
+
+        self.assertEqual(
+            urls,
+            [
+                "http://127.0.0.1:8080",
+                "http://192.168.1.20:8080",
+                "http://192.168.1.50:8080",
+            ],
+        )
+
+    def test_format_startup_message_lists_multiple_urls_for_wildcard_host(self):
+        with patch.object(
+            app_main,
+            "build_access_urls",
+            return_value=["http://127.0.0.1:8080", "http://192.168.1.20:8080"],
+        ):
+            message = app_main.format_startup_message("授权码分发平台", "0.0.0.0", 8080)
+
+        self.assertIn("可通过以下地址访问：", message)
+        self.assertIn("http://127.0.0.1:8080", message)
+        self.assertIn("http://192.168.1.20:8080", message)
+
     def test_distribution_is_scoped_by_pid(self):
         with TemporaryDirectory() as temp_dir:
             app = self.create_test_app(temp_dir)
