@@ -2,12 +2,15 @@ import os
 import shutil
 import socket
 import uuid
-from io import BytesIO
+from contextlib import redirect_stdout
+from io import BytesIO, StringIO
 from pathlib import Path
 from unittest import TestCase
+from unittest.mock import patch
 
 from openpyxl import Workbook, load_workbook
 
+import main as app_main
 from app import create_app
 from app.config import Settings, load_settings
 from app.services.single_instance_service import (
@@ -118,6 +121,34 @@ class PlatformTestCase(TestCase):
             port = sock.getsockname()[1]
             with self.assertRaises(PortUnavailableError):
                 SingleInstanceService.ensure_port_available("127.0.0.1", port)
+
+    def test_exit_with_message_prints_reason_and_wait_prompt(self):
+        output = StringIO()
+        with (
+            patch("builtins.input", return_value="") as mock_input,
+            self.assertRaises(SystemExit) as ctx,
+            redirect_stdout(output),
+        ):
+            app_main.exit_with_message("启动失败示例")
+
+        self.assertEqual(ctx.exception.code, 1)
+        rendered = output.getvalue()
+        self.assertIn("启动失败示例", rendered)
+        mock_input.assert_called_once_with("按回车键退出...\n")
+
+    def test_exit_with_message_can_skip_pause_for_automation(self):
+        output = StringIO()
+        with (
+            patch.dict(os.environ, {"AUTH_PLATFORM_NO_EXIT_PAUSE": "1"}),
+            patch("builtins.input") as mock_input,
+            self.assertRaises(SystemExit),
+            redirect_stdout(output),
+        ):
+            app_main.exit_with_message("自动化退出")
+
+        self.assertIn("自动化退出", output.getvalue())
+        self.assertIn("按回车键退出...", output.getvalue())
+        mock_input.assert_not_called()
 
     def test_distribution_is_scoped_by_pid(self):
         with TemporaryDirectory() as temp_dir:
