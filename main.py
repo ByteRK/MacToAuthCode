@@ -43,25 +43,25 @@ def main() -> None:
             SingleInstanceService.ensure_port_available(settings.host, settings.port)
             app = create_app(settings=settings)
             print(
-                f"{settings.app_name} running on http://{settings.host}:{settings.port}",
+                f"{settings.app_name}\nrunning on http://{settings.host}:{settings.port}",
                 flush=True,
             )
-            print(
-                f"请勿重复启动 {settings.app_name}；如需同时运行多个实例，请为每个实例配置不同端口。",
-                flush=True,
-            )
+            # print(
+            #     f"请勿重复启动 {settings.app_name}；如需同时运行多个实例，请为每个实例配置不同端口。",
+            #     flush=True,
+            # )
             serve(app, host=settings.host, port=settings.port)
     except SingleInstanceError:
         exit_with_message(
-            f"{settings.app_name} 检测到重复启动：端口 {settings.port} 已有本程序实例运行。请不要重复启动；若需同时运行请改用不同端口。",
+            f"{settings.app_name}\n检测到重复启动：端口 {settings.port} 已有本程序实例运行。请不要重复启动；若需同时运行请改用不同端口。",
         )
     except PortUnavailableError:
         exit_with_message(
-            f"{settings.app_name} 无法启动：端口 {settings.port} 已被其他程序占用。请先释放该端口，或改用不同端口后再启动。",
+            f"{settings.app_name}\n无法启动：端口 {settings.port} 已被其他程序占用。请先释放该端口，或改用不同端口后再启动。",
         )
     except Exception as exc:
         exit_with_message(
-            f"{settings.app_name} 启动失败：{exc}",
+            f"{settings.app_name}\n启动失败：{exc}",
         )
 
 
