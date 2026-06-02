@@ -1,5 +1,5 @@
-import { bindSidebar } from "./modules/navigation.js";
-import { loadOverview } from "./modules/overview.js";
+import { bindSidebar, getInitialPanelTarget, switchPanel } from "./modules/navigation.js";
+import { bindOverview, loadOverview } from "./modules/overview.js";
 import { bindAllocationSearch, loadAllocations } from "./modules/allocations.js";
 import { bindInventory, loadInventorySummary, loadCodeDetails } from "./modules/inventory.js";
 import { bindImporter } from "./modules/importer.js";
@@ -17,7 +17,9 @@ async function runLoader(loader, label) {
 }
 
 async function bootstrap() {
+  switchPanel(getInitialPanelTarget(), { emitEvent: false });
   bindSidebar();
+  bindOverview();
   bindPayloadModal();
   bindAllocationSearch();
   bindInventory();

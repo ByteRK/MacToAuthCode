@@ -596,6 +596,14 @@ th {
   transform: none;
 }
 
+.panel-head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .status-chip {
   display: inline-flex;
   align-items: center;
@@ -676,5 +684,10 @@ th {
 
   .import-form {
     grid-template-columns: 1fr;
+  }
+
+  .panel-head-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }

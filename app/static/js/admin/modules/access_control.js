@@ -78,4 +78,16 @@ export function bindAccessControl() {
       setRequestWhitelistResult(error.message);
     }
   });
+
+  document.addEventListener("admin:panelchange", async (event) => {
+    if (event.detail?.targetId !== "access-control-panel") {
+      return;
+    }
+    try {
+      setRequestWhitelistResult("正在刷新白名单配置...");
+      await loadRequestIpWhitelistConfig();
+    } catch (error) {
+      setRequestWhitelistResult(error.message);
+    }
+  });
 }

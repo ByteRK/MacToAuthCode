@@ -26,3 +26,19 @@ export async function loadOverview() {
   const payload = await fetchJson("/api/admin/overview");
   renderSummary(payload.data.summary);
 }
+
+export function bindOverview() {
+  const refreshButton = byId("overview-refresh-btn");
+  if (refreshButton instanceof HTMLButtonElement) {
+    refreshButton.addEventListener("click", async () => {
+      await loadOverview();
+    });
+  }
+
+  document.addEventListener("admin:panelchange", async (event) => {
+    if (event.detail?.targetId !== "overview-panel") {
+      return;
+    }
+    await loadOverview();
+  });
+}

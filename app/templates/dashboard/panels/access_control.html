@@ -5,6 +5,9 @@
         <h2>访问控制</h2>
         <p class="muted">配置设备授权接口的请求 IP 白名单。支持单个 IP 和 CIDR 网段，保存后立即生效。</p>
       </div>
+      <div class="panel-head-actions">
+        <button type="button" class="ghost-btn" id="request-ip-whitelist-reload">刷新配置</button>
+      </div>
     </div>
     <form id="request-ip-whitelist-form" class="stack access-control-form">
       <label class="switch-field access-switch-field">
@@ -24,7 +27,6 @@
       </div>
       <div class="inline-form">
         <button type="submit" class="primary-btn">保存白名单配置</button>
-        <button type="button" class="ghost-btn" id="request-ip-whitelist-reload">重新加载</button>
       </div>
     </form>
     <div id="request-ip-whitelist-result" class="import-feedback muted"></div>

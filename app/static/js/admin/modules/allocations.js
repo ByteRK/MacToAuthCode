@@ -38,6 +38,13 @@ export async function loadAllocations() {
 }
 
 export function bindAllocationSearch() {
+  const refreshButton = byId("allocations-refresh-btn");
+  if (refreshButton instanceof HTMLButtonElement) {
+    refreshButton.addEventListener("click", async () => {
+      await loadAllocations();
+    });
+  }
+
   byId("allocation-search-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     state.allocations.page = 1;
@@ -85,5 +92,12 @@ export function bindAllocationSearch() {
     }
     event.preventDefault();
     byId("allocations-page-go").click();
+  });
+
+  document.addEventListener("admin:panelchange", async (event) => {
+    if (event.detail?.targetId !== "allocations-panel") {
+      return;
+    }
+    await loadAllocations();
   });
 }

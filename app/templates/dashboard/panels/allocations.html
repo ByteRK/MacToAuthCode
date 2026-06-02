@@ -5,13 +5,16 @@
         <h2>分配记录</h2>
         <p class="muted">按 PID、MAC 或显示标识检索已经下发的授权记录。</p>
       </div>
-      <form id="allocation-search-form" class="inline-form">
-        <label class="toolbar-field toolbar-field-wide">
-          <span>关键词</span>
-          <input id="allocation-search" type="search" placeholder="搜索 PID / MAC / 显示标识">
-        </label>
-        <button type="submit" class="ghost-btn">查询</button>
-      </form>
+      <div class="panel-head-actions">
+        <form id="allocation-search-form" class="inline-form">
+          <label class="toolbar-field toolbar-field-wide">
+            <span>关键词</span>
+            <input id="allocation-search" type="search" placeholder="搜索 PID / MAC / 显示标识">
+          </label>
+          <button type="submit" class="ghost-btn">查询</button>
+        </form>
+        <button type="button" class="ghost-btn" id="allocations-refresh-btn">刷新记录</button>
+      </div>
     </div>
     <div class="table-wrap">
       <table>

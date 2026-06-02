@@ -107,6 +107,21 @@ export function selectPid(pid) {
 }
 
 export function bindInventory() {
+  const summaryRefreshButton = byId("inventory-summary-refresh-btn");
+  if (summaryRefreshButton instanceof HTMLButtonElement) {
+    summaryRefreshButton.addEventListener("click", async () => {
+      await loadInventorySummary();
+      await loadCodeDetails();
+    });
+  }
+
+  const detailsRefreshButton = byId("code-details-refresh-btn");
+  if (detailsRefreshButton instanceof HTMLButtonElement) {
+    detailsRefreshButton.addEventListener("click", async () => {
+      await loadCodeDetails();
+    });
+  }
+
   byId("inventory-summary-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     state.inventorySummary.page = 1;
@@ -220,6 +235,14 @@ export function bindInventory() {
     }
     event.preventDefault();
     byId("inventory-summary-page-go").click();
+  });
+
+  document.addEventListener("admin:panelchange", async (event) => {
+    if (event.detail?.targetId !== "inventory-panel") {
+      return;
+    }
+    await loadInventorySummary();
+    await loadCodeDetails();
   });
 
   resetInventorySummaryPagination();
