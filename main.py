@@ -34,7 +34,10 @@ def _pause_before_exit() -> None:
 
 def main() -> None:
     settings = load_settings()
-    lock_path = SingleInstanceService.build_lock_path(settings.data_dir, settings.port)
+    lock_path = SingleInstanceService.build_runtime_lock_path(
+        settings.app_name,
+        settings.port,
+    )
     try:
         with SingleInstanceService(lock_path):
             SingleInstanceService.ensure_port_available(settings.host, settings.port)

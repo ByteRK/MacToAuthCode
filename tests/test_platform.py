@@ -108,6 +108,18 @@ class PlatformTestCase(TestCase):
                 with self.assertRaises(SingleInstanceError):
                     second.acquire()
 
+    def test_runtime_lock_path_uses_shared_system_location(self):
+        with patch.dict(os.environ, {"LOCALAPPDATA": r"D:\LockRoot"}):
+            lock_path = SingleInstanceService.build_runtime_lock_path(
+                "授权码分发平台",
+                8080,
+            )
+
+        self.assertEqual(
+            lock_path,
+            Path(r"D:\LockRoot") / "授权码分发平台" / "locks" / "instance-8080.lock",
+        )
+
     def test_port_check_allows_available_port(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.bind(("127.0.0.1", 0))

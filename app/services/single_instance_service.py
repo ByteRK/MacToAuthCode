@@ -1,6 +1,7 @@
 import json
 import os
 import socket
+import sys
 from pathlib import Path
 from typing import TextIO
 
@@ -61,6 +62,27 @@ class SingleInstanceService:
     @staticmethod
     def build_lock_path(base_dir: Path, port: int) -> Path:
         return base_dir / f"instance-{port}.lock"
+
+    @staticmethod
+    def build_runtime_lock_path(app_name: str, port: int) -> Path:
+        return SingleInstanceService.runtime_lock_dir(app_name) / f"instance-{port}.lock"
+
+    @staticmethod
+    def runtime_lock_dir(app_name: str) -> Path:
+        safe_name = "".join(
+            char if char.isalnum() or char in {"-", "_"} else "_"
+            for char in app_name.strip()
+        ).strip("_") or "auth_code_platform"
+
+        if os.name == "nt":
+            base_dir = Path(os.getenv("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+        elif sys.platform == "darwin":
+            base_dir = Path.home() / "Library" / "Application Support"
+        else:
+            base_dir = Path(
+                os.getenv("XDG_STATE_HOME", Path.home() / ".local" / "state")
+            )
+        return base_dir / safe_name / "locks"
 
     @staticmethod
     def ensure_port_available(host: str, port: int) -> None:
