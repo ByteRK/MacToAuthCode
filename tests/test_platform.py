@@ -1,13 +1,34 @@
 import os
+import shutil
+import uuid
 from io import BytesIO
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from unittest import TestCase
 
 from openpyxl import Workbook, load_workbook
 
 from app import create_app
 from app.config import Settings, load_settings
+from app.services.single_instance_service import (
+    SingleInstanceError,
+    SingleInstanceService,
+)
+
+
+class TemporaryDirectory:
+    def __init__(self) -> None:
+        self.path = (
+            Path(__file__).resolve().parent
+            / ".tmp"
+            / f"case-{uuid.uuid4().hex}"
+        )
+
+    def __enter__(self) -> str:
+        self.path.mkdir(parents=True, exist_ok=True)
+        return str(self.path)
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        shutil.rmtree(self.path, ignore_errors=True)
 
 
 class PlatformTestCase(TestCase):
@@ -59,6 +80,28 @@ class PlatformTestCase(TestCase):
                 settings.request_ip_whitelist,
                 ("192.168.1.10", "192.168.1.0/24"),
             )
+
+    def test_single_instance_lock_allows_different_ports(self):
+        with TemporaryDirectory() as temp_dir:
+            base_dir = Path(temp_dir)
+            first = SingleInstanceService(
+                SingleInstanceService.build_lock_path(base_dir, 8080)
+            )
+            second = SingleInstanceService(
+                SingleInstanceService.build_lock_path(base_dir, 8081)
+            )
+            with first, second:
+                self.assertTrue(first.lock_path.exists())
+                self.assertTrue(second.lock_path.exists())
+
+    def test_single_instance_lock_rejects_same_port(self):
+        with TemporaryDirectory() as temp_dir:
+            lock_path = SingleInstanceService.build_lock_path(Path(temp_dir), 8080)
+            first = SingleInstanceService(lock_path)
+            second = SingleInstanceService(lock_path)
+            with first:
+                with self.assertRaises(SingleInstanceError):
+                    second.acquire()
 
     def test_distribution_is_scoped_by_pid(self):
         with TemporaryDirectory() as temp_dir:
