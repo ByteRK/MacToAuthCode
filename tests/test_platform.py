@@ -245,6 +245,19 @@ class PlatformTestCase(TestCase):
             self.assertEqual(first.get_json()["data"]["payload"]["license"], "P1-001")
             self.assertEqual(second.get_json()["data"]["mode"], "reused")
             self.assertEqual(third.get_json()["data"]["display_code"], "DID-P2-001")
+            self.assertEqual(first.headers["Access-Control-Allow-Origin"], "*")
+
+    def test_device_authorize_supports_cors_preflight(self):
+        with TemporaryDirectory() as temp_dir:
+            app = self.create_test_app(temp_dir)
+            client = app.test_client()
+
+            response = client.open("/api/device/authorize", method="OPTIONS")
+
+            self.assertEqual(response.status_code, 204)
+            self.assertEqual(response.headers["Access-Control-Allow-Origin"], "*")
+            self.assertEqual(response.headers["Access-Control-Allow-Methods"], "POST, OPTIONS")
+            self.assertIn("Content-Type", response.headers["Access-Control-Allow-Headers"])
 
     def test_device_authorize_rejects_requests_outside_ip_whitelist(self):
         with TemporaryDirectory() as temp_dir:
