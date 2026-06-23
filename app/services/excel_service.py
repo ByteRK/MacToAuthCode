@@ -1,5 +1,6 @@
 from io import BytesIO
 import hashlib
+from itertools import chain
 import json
 from typing import BinaryIO
 
@@ -117,35 +118,45 @@ class ExcelService:
         default_pid: str | None,
     ) -> list[dict[str, str]]:
         workbook = load_workbook(file_stream, read_only=True, data_only=True)
-        sheet = workbook.active
-        values = list(sheet.iter_rows(values_only=True))
-        if not values:
-            return []
+        try:
+            sheet = workbook.active
+            row_iter = sheet.iter_rows(values_only=True)
+            first_row_tuple = next(row_iter, None)
+            if first_row_tuple is None:
+                return []
 
-        first_row = list(values[0])
-        header_map = self._match_headers(first_row)
-        has_header = self._looks_like_header_row(first_row, header_map)
+            first_row = list(first_row_tuple)
+            header_map = self._match_headers(first_row)
+            has_header = self._looks_like_header_row(first_row, header_map)
 
-        data_rows = values[1:] if has_header else values
-        parsed_rows: list[dict[str, str]] = []
-        errors: list[str] = []
-        start_row_number = 2 if has_header else 1
-        for offset, row in enumerate(data_rows):
-            current = list(row)
-            row_number = start_row_number + offset
-            try:
-                if has_header:
-                    parsed = self._parse_structured_row(current, first_row, default_pid)
-                else:
-                    parsed = self._parse_simple_row(current, default_pid)
-            except ValueError as exc:
-                errors.append(f"第 {row_number} 行：{exc}")
-                continue
-            if parsed:
-                parsed_rows.append(parsed)
-        if errors:
-            raise ImportValidationError("导入校验失败，请先修正以下问题后再重试", errors)
-        return parsed_rows
+            parsed_rows: list[dict[str, str]] = []
+            errors: list[str] = []
+
+            if has_header:
+                start_row_number = 2
+                iterable_rows = row_iter
+            else:
+                start_row_number = 1
+                iterable_rows = chain([first_row_tuple], row_iter)
+
+            for offset, row in enumerate(iterable_rows):
+                current = list(row)
+                row_number = start_row_number + offset
+                try:
+                    if has_header:
+                        parsed = self._parse_structured_row(current, first_row, default_pid)
+                    else:
+                        parsed = self._parse_simple_row(current, default_pid)
+                except ValueError as exc:
+                    errors.append(f"第 {row_number} 行：{exc}")
+                    continue
+                if parsed:
+                    parsed_rows.append(parsed)
+            if errors:
+                raise ImportValidationError("导入校验失败，请先修正以下问题后再重试", errors)
+            return parsed_rows
+        finally:
+            workbook.close()
 
     @staticmethod
     def _match_headers(first_row: list[object]) -> dict[str, int]:

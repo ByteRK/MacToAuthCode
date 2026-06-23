@@ -6,6 +6,8 @@ from app.database import Database
 
 
 class AuthCodeRepository:
+    EXISTING_PID_DID_QUERY_BATCH_SIZE = 400
+
     def __init__(self, database: Database) -> None:
         self.database = database
 
@@ -393,16 +395,22 @@ class AuthCodeRepository:
         )
         if not normalized:
             return set()
-        where_sql = " OR ".join("(pid = ? AND did = ?)" for _ in normalized)
-        params = [value for pair in normalized for value in pair]
-        rows = conn.execute(
-            f"SELECT pid, did FROM auth_codes WHERE {where_sql}",
-            params,
-        ).fetchall()
-        return {
-            AuthCodeRepository._format_pid_did(row["pid"], row["did"])
-            for row in rows
-        }
+
+        existing: set[str] = set()
+        batch_size = AuthCodeRepository.EXISTING_PID_DID_QUERY_BATCH_SIZE
+        for start in range(0, len(normalized), batch_size):
+            batch = normalized[start : start + batch_size]
+            where_sql = " OR ".join("(pid = ? AND did = ?)" for _ in batch)
+            params = [value for pair in batch for value in pair]
+            rows = conn.execute(
+                f"SELECT pid, did FROM auth_codes WHERE {where_sql}",
+                params,
+            ).fetchall()
+            existing.update(
+                AuthCodeRepository._format_pid_did(row["pid"], row["did"])
+                for row in rows
+            )
+        return existing
 
     @staticmethod
     def _format_pid_did(pid: str, did: str) -> str:

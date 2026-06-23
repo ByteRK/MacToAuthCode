@@ -805,6 +805,32 @@ class PlatformTestCase(TestCase):
             codes = repo.list_codes(status="all", search="DID-001", page=1, page_size=10)
             self.assertEqual(codes["total"], 2)
 
+    def test_excel_import_supports_more_than_one_thousand_rows(self):
+        with TemporaryDirectory() as temp_dir:
+            app = self.create_test_app(temp_dir)
+            excel_service = app.extensions["excel_service"]
+            repo = app.extensions["auth_code_repository"]
+
+            workbook = Workbook()
+            sheet = workbook.active
+            sheet.append(["pid", "did", "license", "source_batch"])
+            for index in range(1200):
+                suffix = f"{index:04d}"
+                sheet.append(["P-LARGE", f"DID-{suffix}", f"LIC-{suffix}", "BULK"])
+
+            buffer = BytesIO()
+            workbook.save(buffer)
+            buffer.seek(0)
+
+            result = excel_service.import_codes(buffer)
+
+            self.assertEqual(result["inserted"], 1200)
+            self.assertEqual(result["skipped"], 0)
+            self.assertEqual(result["total_rows"], 1200)
+
+            codes = repo.list_codes(status="all", search="P-LARGE", page=1, page_size=20)
+            self.assertEqual(codes["total"], 1200)
+
     def test_inventory_summary_is_grouped_by_pid(self):
         with TemporaryDirectory() as temp_dir:
             app = self.create_test_app(temp_dir)
