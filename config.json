@@ -3,14 +3,15 @@
   "host": "0.0.0.0",
   "port": 8080,
   "admin_username": "admin",
-  "admin_password": "ChangeMe123!",
+  "admin_password": "Abcd+123",
   "secret_key": "replace-with-a-random-string",
   "data_dir": "data",
   "request_ip_whitelist": {
     "enabled": false,
     "allowed_ips": [
       "127.0.0.1",
-      "192.168.1.0/24"
+      "192.168.1.0/24",
+      "10.0.0.0/24"
     ]
   }
 }

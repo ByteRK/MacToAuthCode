@@ -91,7 +91,7 @@ def load_settings() -> Settings:
         admin_password=str(
             os.getenv(
                 "AUTH_PLATFORM_ADMIN_PASSWORD",
-                file_config.get("admin_password", "ChangeMe123!"),
+                file_config.get("admin_password", "Abcd+123"),
             )
         ),
         secret_key=str(
