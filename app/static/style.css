@@ -255,6 +255,110 @@ a.ghost-btn:hover {
   margin-top: 14px;
 }
 
+.import-status-card {
+  margin-top: 16px;
+  padding: 18px 20px;
+  border-radius: 18px;
+  border: 1px solid rgba(141, 63, 25, 0.12);
+  background: rgba(255, 248, 239, 0.9);
+}
+
+.import-status-card.is-success {
+  border-color: rgba(46, 125, 91, 0.18);
+  background: rgba(241, 250, 245, 0.94);
+}
+
+.import-status-card.is-error {
+  border-color: rgba(163, 49, 49, 0.18);
+  background: rgba(253, 244, 244, 0.94);
+}
+
+.import-status-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.import-progress-track {
+  margin-top: 14px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(141, 63, 25, 0.08);
+  overflow: hidden;
+}
+
+.import-progress-bar {
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #c25b2a 0%, #e59d59 100%);
+  transition: width 0.24s ease;
+}
+
+.import-status-card.is-success .import-progress-bar {
+  background: linear-gradient(90deg, #2e7d5b 0%, #79b18f 100%);
+}
+
+.import-status-card.is-error .import-progress-bar {
+  background: linear-gradient(90deg, #a33131 0%, #d97373 100%);
+}
+
+.import-progress-text {
+  margin-top: 10px;
+}
+
+.import-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.import-summary-item {
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(141, 63, 25, 0.08);
+}
+
+.import-summary-item span {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.import-summary-item strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 24px;
+  color: var(--ink);
+}
+
+.import-warning-box {
+  margin-top: 14px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(191, 122, 27, 0.2);
+  background: rgba(246, 208, 132, 0.14);
+}
+
+.import-warning-title {
+  font-weight: 700;
+  color: #8e5a12;
+}
+
+.import-warning-list {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: #7d5720;
+}
+
+.import-warning-list li + li {
+  margin-top: 6px;
+}
+
 .import-error-box {
   margin-top: 14px;
   padding: 16px 18px;
@@ -689,5 +793,9 @@ th {
   .panel-head-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .import-summary {
+    grid-template-columns: 1fr;
   }
 }
