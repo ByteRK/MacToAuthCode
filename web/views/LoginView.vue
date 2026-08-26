@@ -1,2 +1,44 @@
-<script setup lang="ts">import {reactive,ref} from 'vue';import {useRouter} from 'vue-router';import {ElMessage} from 'element-plus';import {api,json} from '../api/client';const router=useRouter(),loading=ref(false),form=reactive({username:'',password:''});async function submit(){loading.value=true;try{await api('/api/admin/login',json('POST',form));router.push('/')}catch(e){ElMessage.error((e as Error).message)}finally{loading.value=false}}</script>
-<template><div class="login-page"><div class="login-panel"><div class="brand login-brand"><div class="brand-logo">AC</div><div><strong>授权码分发平台</strong><span>企业设备授权控制中心</span></div></div><div class="login-copy"><span>ADMIN CONSOLE</span><h1>欢迎回来</h1><p>登录后管理授权库存、分配关系与运行记录。</p></div><el-form label-position="top" @submit.prevent="submit"><el-form-item label="管理员账号"><el-input v-model="form.username" size="large" autocomplete="username"/></el-form-item><el-form-item label="密码"><el-input v-model="form.password" size="large" type="password" show-password autocomplete="current-password" @keyup.enter="submit"/></el-form-item><el-button class="full-button" type="primary" size="large" :loading="loading" @click="submit">登录管理后台</el-button></el-form></div></div></template>
+<script setup lang="ts">
+import { reactive, ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { ElMessage } from 'element-plus';
+import { api, json } from '../api/client';
+const router = useRouter(), loading = ref(false), form = reactive({ username: '', password: '' });
+async function submit() {
+    loading.value = true;
+    try {
+        await api('/api/admin/login', json('POST', form));
+        router.push('/')
+    } catch (e) {
+        ElMessage.error((e as Error).message)
+    } finally {
+        loading.value = false
+    }
+}
+</script>
+<template>
+    <div class="login-page">
+        <div class="login-panel">
+            <div class="brand login-brand">
+                <div class="brand-logo">AC</div>
+                <div>
+                    <strong>授权码分发平台</strong>
+                </div>
+            </div>
+            <div class="login-copy"><span>ADMIN CONSOLE</span>
+                <h1>欢迎回来</h1>
+            </div>
+            <el-form label-position="top" @submit.prevent="submit">
+                <el-form-item label="管理员账号">
+                    <el-input v-model="form.username" size="large" autocomplete="username" />
+                </el-form-item>
+                <el-form-item label="密码">
+                    <el-input v-model="form.password" size="large" type="password" show-password
+                        autocomplete="current-password" @keyup.enter="submit" />
+                </el-form-item>
+                <el-button class="full-button" type="primary" size="large" :loading="loading"
+                    @click="submit">登录管理后台</el-button>
+            </el-form>
+        </div>
+    </div>
+</template>
