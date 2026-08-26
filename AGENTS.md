@@ -60,6 +60,9 @@ AuthCodePlatform --host 0.0.0.0 --port 8080 --admin-user admin --admin-password 
 - `AUTH_PLATFORM_DATA_DIR`
 - `AUTH_PLATFORM_NAME`
 - `AUTH_PLATFORM_PUBLIC_DIR`
+- `AUTH_PLATFORM_DEBUG`
+
+默认关闭 Fastify 全量访问日志，只格式化打印 `/api/device/authorize` 的完整请求与响应。`--debug`、`AUTH_PLATFORM_DEBUG=true` 或配置文件 `debug: true` 会启用全部 Web 请求日志，仍遵循统一配置优先级。
 
 默认监听 `0.0.0.0:8080`。若请求端口因占用或 Windows 保留端口而返回 `EADDRINUSE`/`EACCES`，服务会从该端口向上逐个尝试，并在启动日志中打印本机所有可访问 IP 和最终端口。管理后台直接访问其中任一 URL。
 

@@ -9,7 +9,7 @@ async function main(){
     if(listening.adjusted)console.warn(`端口 ${config.port} 不可用，已自动切换到端口 ${listening.port}。`)
     console.log(`${config.appName} 已启动，可通过以下地址访问：\n${buildAccessUrls(config.host,listening.port).join('\n')}`)
   }catch(error){
-    app.log.error(error)
+    console.error(error)
     process.exit(1)
   }
 }

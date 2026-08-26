@@ -48,10 +48,13 @@ AuthCodePlatform --config ./config.json --host 0.0.0.0 --port 8080 --admin-user 
 - `AUTH_PLATFORM_DATA_DIR`
 - `AUTH_PLATFORM_NAME`
 - `AUTH_PLATFORM_PUBLIC_DIR`
+- `AUTH_PLATFORM_DEBUG`
 
 默认读取程序所在目录的 `config.json`，也可通过 `--config <路径>` 指定文件。字段参考 `config.example.json`。配置文件中的相对数据和 Web 目录以配置文件所在目录为基准；显式指定但不存在或格式错误时，程序会拒绝启动。
 
 优先级为命令行参数、环境变量、JSON 配置文件、内置默认值。生产环境必须设置强密码。管理后台仅使用 HTTP，适用于可信局域网。
+
+默认仅在终端格式化打印 `/api/device/authorize` 的完整请求和完整响应。传入 `--debug`（或设置 `AUTH_PLATFORM_DEBUG=true`、配置文件 `"debug": true`）后，额外启用全部 HTTP 请求的 Fastify 调试日志。
 
 如果指定端口已被占用或被 Windows保留，程序会从该端口开始向后查找可用端口，并在启动信息中打印所有可访问的 IP地址和最终端口。可通过以下命令查看 Windows系统保留端口：
 

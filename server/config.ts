@@ -4,11 +4,11 @@ import { isSea as runtimeIsSea } from 'node:sea'
 
 export interface AppConfig {
   appName: string; host: string; port: number; adminUser: string; adminPassword: string
-  dataDir: string; databasePath: string; publicDir: string
+  dataDir: string; databasePath: string; publicDir: string;debug?:boolean
 }
 
 interface FileConfig {
-  appName?:string;host?:string;port?:number|string;adminUser?:string;adminPassword?:string;dataDir?:string;publicDir?:string
+  appName?:string;host?:string;port?:number|string;adminUser?:string;adminPassword?:string;dataDir?:string;publicDir?:string;debug?:boolean|string
 }
 
 export interface ConfigLoadOptions {
@@ -30,6 +30,7 @@ function readJsonConfig(path:string,required:boolean):FileConfig {
   const config=parsed as Record<string,unknown>
   for(const key of ['appName','host','adminUser','adminPassword','dataDir','publicDir'])if(config[key]!==undefined&&typeof config[key]!=='string')throw new Error(`配置项 ${key} 必须是字符串`)
   if(config.port!==undefined&&typeof config.port!=='number'&&typeof config.port!=='string')throw new Error('配置项 port 必须是数字')
+  if(config.debug!==undefined&&typeof config.debug!=='boolean'&&typeof config.debug!=='string')throw new Error('配置项 debug 必须是布尔值')
   return config as FileConfig
 }
 
@@ -45,6 +46,7 @@ export function loadConfig(options:ConfigLoadOptions={}):AppConfig {
   const dataDir=cliDataDir?resolve(cwd,cliDataDir):envDataDir?resolve(cwd,envDataDir):file.dataDir?resolve(configDir,file.dataDir):resolve(runtimeDir,'data')
   const cliPublicDir=argument('public-dir',argv),envPublicDir=env.AUTH_PLATFORM_PUBLIC_DIR
   const publicDir=cliPublicDir?resolve(cwd,cliPublicDir):envPublicDir?resolve(cwd,envPublicDir):file.publicDir?resolve(configDir,file.publicDir):(sea?resolve(runtimeDir,'public'):resolve(runtimeDir,'dist','public'))
+  const inlineDebug=argument('debug',argv),cliDebug=inlineDebug??(argv.includes('--debug')?'true':undefined)
   const config:AppConfig={
     appName:argument('app-name',argv)??env.AUTH_PLATFORM_NAME??file.appName??'授权码分发平台',
     host:argument('host',argv)??env.AUTH_PLATFORM_HOST??file.host??'0.0.0.0',
@@ -52,6 +54,7 @@ export function loadConfig(options:ConfigLoadOptions={}):AppConfig {
     adminUser:argument('admin-user',argv)??env.AUTH_PLATFORM_ADMIN_USER??file.adminUser??'admin',
     adminPassword:argument('admin-password',argv)??env.AUTH_PLATFORM_ADMIN_PASSWORD??file.adminPassword??'Abcd+123',
     dataDir,databasePath:resolve(dataDir,'auth-platform.db'),publicDir,
+    debug:parseBoolean(cliDebug??env.AUTH_PLATFORM_DEBUG??file.debug??false,'debug'),
   }
   if(!Number.isInteger(config.port)||config.port<1||config.port>65535)throw new Error('端口必须在 1-65535 之间')
   if(!config.appName.trim())throw new Error('系统名称不能为空')
@@ -60,3 +63,5 @@ export function loadConfig(options:ConfigLoadOptions={}):AppConfig {
   mkdirSync(config.dataDir,{recursive:true})
   return config
 }
+
+function parseBoolean(value:unknown,name:string){if(typeof value==='boolean')return value;const normalized=String(value).trim().toLowerCase();if(['1','true','yes','on'].includes(normalized))return true;if(['0','false','no','off'].includes(normalized))return false;throw new Error(`配置项 ${name} 必须是 true 或 false`)}
