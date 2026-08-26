@@ -42,7 +42,7 @@ async function confirmImport(){
 
   <el-dialog v-model="duplicateDialog" title="发现重复授权码" width="760" :close-on-click-modal="false">
     <el-alert type="warning" show-icon :closable="false" :title="`共 ${preview?.totalRows??0} 条：合法 ${preview?.validCount??0} 条，重复 ${preview?.duplicateCount??0} 条`" description="重复项不会覆盖系统中的现有数据。请确认是否导入剩余未重复项。"/>
-    <el-table class="duplicate-table" :data="preview?.duplicates??[]" max-height="360"><el-table-column prop="row" label="Excel 行" width="90"/><el-table-column prop="pid" label="PID" min-width="160"/><el-table-column prop="did" label="DID" min-width="190"/><el-table-column label="重复类型" width="130"><template #default="{row}"><el-tag :type="row.duplicateWith==='assigned'?'danger':'warning'">{{row.duplicateLabel}}</el-tag></template></el-table-column></el-table>
+    <el-table class="duplicate-table" :data="preview?.duplicates??[]" max-height="360"><el-table-column label="序号" width="70" align="center"><template #default="{$index}">{{$index+1}}</template></el-table-column><el-table-column prop="row" label="Excel 行" width="90"/><el-table-column prop="pid" label="PID" min-width="160"/><el-table-column prop="did" label="DID" min-width="190"/><el-table-column label="重复类型" width="130"><template #default="{row}"><el-tag :type="row.duplicateWith==='assigned'?'danger':'warning'">{{row.duplicateLabel}}</el-tag></template></el-table-column></el-table>
     <template #footer><el-button @click="duplicateDialog=false">取消当次导入</el-button><el-button type="primary" :loading="loading" :disabled="!preview?.validCount" @click="confirmImport">导入剩余 {{preview?.validCount??0}} 条</el-button></template>
   </el-dialog>
 </template>
