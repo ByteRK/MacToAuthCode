@@ -1,0 +1,9 @@
+{
+  "appName": "授权码分发平台",
+  "host": "0.0.0.0",
+  "port": 8080,
+  "adminUser": "admin",
+  "adminPassword": "replace-with-a-strong-password",
+  "dataDir": "./data",
+  "publicDir": "./public"
+}

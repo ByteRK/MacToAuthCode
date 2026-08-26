@@ -45,7 +45,7 @@ yarn package:standalone
 
 ## 4. 启动配置与端口行为
 
-命令行参数优先于环境变量，环境变量优先于默认值：
+运行配置优先级固定为：命令行参数 > 环境变量 > JSON 配置文件 > 内置默认值。默认读取程序所在目录的 `config.json`，`--config <路径>` 可指定其他文件；配置字段和示例见 `config.example.json`。
 
 ```text
 AuthCodePlatform --host 0.0.0.0 --port 8080 --admin-user admin --admin-password "your-password" --data-dir ./data
