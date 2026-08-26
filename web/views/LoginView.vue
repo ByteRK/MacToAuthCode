@@ -25,7 +25,8 @@ async function submit() {
                     <strong>授权码分发平台</strong>
                 </div>
             </div>
-            <div class="login-copy"><span>ADMIN CONSOLE</span>
+            <div class="login-copy">
+                <span>ADMIN CONSOLE</span>
                 <h1>欢迎回来</h1>
             </div>
             <el-form label-position="top" @submit.prevent="submit">
