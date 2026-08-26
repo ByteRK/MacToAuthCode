@@ -4,6 +4,7 @@ export type AuditAction = 'assigned' | 'reused' | 'exhausted' | 'created' | 'upd
 export interface AuthCodeRecord {
   id: number
   pid: string
+  pidRemark?: string
   did: string
   license: string
   payload: Record<string, string>

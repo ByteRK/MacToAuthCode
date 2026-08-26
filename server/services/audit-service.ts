@@ -10,6 +10,9 @@ export class AuditService {
     if(action!=='all'){clauses.push('action=?');params.push(action)}
     if(search){clauses.push('(pid LIKE ? OR mac LIKE ? OR did LIKE ?)');params.push(`%${search}%`,`%${search}%`,`%${search}%`)}
     const where=clauses.length?`WHERE ${clauses.join(' AND ')}`:''
-    return this.database.raw.prepare(`SELECT id,action,entity_type entityType,entity_id entityId,pid,mac,did,client_ip clientIp,message,snapshot_json snapshotJson,created_at createdAt FROM audit_logs ${where} ORDER BY id DESC LIMIT ?`).all(...params,limit)
+    return this.database.raw.prepare(`SELECT id,action,entity_type entityType,entity_id entityId,pid,
+      COALESCE((SELECT remark FROM pid_metadata WHERE pid=audit_logs.pid),'') pidRemark,
+      mac,did,client_ip clientIp,message,snapshot_json snapshotJson,created_at createdAt
+      FROM audit_logs ${where} ORDER BY id DESC LIMIT ?`).all(...params,limit)
   }
 }

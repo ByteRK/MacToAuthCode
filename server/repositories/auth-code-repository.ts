@@ -4,7 +4,7 @@ import { escapeLike } from '../domain/normalize.js'
 
 type DbRow = Record<string, unknown>
 const decode = (row: DbRow): AuthCodeRecord => ({
-  id: Number(row.id), pid: String(row.pid), did: String(row.did), license: String(row.license),
+  id: Number(row.id), pid: String(row.pid), pidRemark:row.pid_remark?String(row.pid_remark):'', did: String(row.did), license: String(row.license),
   payload: JSON.parse(String(row.payload_json)), sourceBatch: row.source_batch ? String(row.source_batch) : null,
   status: String(row.status) as CodeStatus, assignedMac: row.assigned_mac ? String(row.assigned_mac) : null,
   assignedAt: row.assigned_at ? String(row.assigned_at) : null, createdAt: String(row.created_at), updatedAt: String(row.updated_at),
@@ -43,7 +43,7 @@ export class AuthCodeRepository {
     if (query.search) { const key=`%${escapeLike(query.search)}%`; clauses.push("(pid LIKE ? ESCAPE '\\' OR did LIKE ? ESCAPE '\\' OR assigned_mac LIKE ? ESCAPE '\\' OR payload_json LIKE ? ESCAPE '\\')"); params.push(key,key,key,key) }
     const where=clauses.length?`WHERE ${clauses.join(' AND ')}`:''; const offset=(query.page-1)*query.pageSize
     const total=Number((this.database.raw.prepare(`SELECT COUNT(*) total FROM auth_codes ${where}`).get(...params) as {total:number}).total)
-    const rows=this.database.raw.prepare(`SELECT * FROM auth_codes ${where} ORDER BY id DESC LIMIT ? OFFSET ?`).all(...params,query.pageSize,offset) as DbRow[]
+    const rows=this.database.raw.prepare(`SELECT *,COALESCE((SELECT remark FROM pid_metadata WHERE pid=auth_codes.pid),'') pid_remark FROM auth_codes ${where} ORDER BY id DESC LIMIT ? OFFSET ?`).all(...params,query.pageSize,offset) as DbRow[]
     return { items: rows.map(decode), total, page:query.page, pageSize:query.pageSize }
   }
   summary() {
