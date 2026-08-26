@@ -12,7 +12,7 @@ export class PidService {
       SUM(c.status='available') availableCodes,SUM(c.status='assigned') assignedCodes,
       MAX(c.updated_at) lastDataAt,m.updated_at remarkUpdatedAt
       FROM auth_codes c LEFT JOIN pid_metadata m ON m.pid=c.pid ${where}
-      GROUP BY c.pid,m.remark,m.updated_at ORDER BY c.pid LIMIT ? OFFSET ?`).all(...params,query.pageSize,(query.page-1)*query.pageSize)
+      GROUP BY c.pid,m.remark,m.updated_at ORDER BY c.pid COLLATE NOCASE ASC,c.pid ASC LIMIT ? OFFSET ?`).all(...params,query.pageSize,(query.page-1)*query.pageSize)
     return {items,total,page:query.page,pageSize:query.pageSize}
   }
   updateRemark(pidInput:string,remarkInput:string){
