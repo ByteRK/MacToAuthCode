@@ -16,6 +16,10 @@ export class AuthCodeRepository {
     const row = this.database.raw.prepare('SELECT * FROM auth_codes WHERE pid=? AND assigned_mac=? LIMIT 1').get(pid, mac) as DbRow | undefined
     return row ? decode(row) : null
   }
+  findByPidDid(pid:string,did:string) {
+    const row=this.database.raw.prepare('SELECT * FROM auth_codes WHERE pid=? AND did=? LIMIT 1').get(pid,did) as DbRow|undefined
+    return row?decode(row):null
+  }
   claimNext(pid: string, mac: string) {
     const row = this.database.raw.prepare("SELECT id FROM auth_codes WHERE pid=? AND status='available' ORDER BY id LIMIT 1").get(pid) as { id: number } | undefined
     if (!row) return null
