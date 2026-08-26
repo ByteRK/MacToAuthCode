@@ -15,6 +15,7 @@ import { InventoryService } from './services/inventory-service.js'
 import { ExcelService } from './services/excel-service.js'
 import { MigrationService } from './services/migration-service.js'
 import { PidService } from './services/pid-service.js'
+import { CiotImportService } from './services/ciot-import-service.js'
 
 const numberParam=(value:unknown,fallback:number,min=1,max=100)=>Math.min(Math.max(Number(value)||fallback,min),max)
 
@@ -22,7 +23,7 @@ export async function buildApp(config:AppConfig,database=new Database(config.dat
   const app=Fastify({logger:config.debug===true,bodyLimit:50*1024*1024});await app.register(cookie);await app.register(formbody);await app.register(multipart,{limits:{fileSize:50*1024*1024}})
   // The legacy endpoint accepted uncommon content types and then fell back to query parameters.
   app.addContentTypeParser('*',{parseAs:'string'},(_request,body,done)=>done(null,body))
-  const repo=new AuthCodeRepository(database);const audit=new AuditService(database);const auth=new AuthService(config);const distribution=new DistributionService(repo,audit);const inventory=new InventoryService(repo,audit,config.adminPassword);const excel=new ExcelService(repo,audit);const migration=new MigrationService(repo,audit);const pids=new PidService(database,audit);const deviceRequests=new WeakMap<FastifyRequest,Record<string,unknown>>()
+  const repo=new AuthCodeRepository(database);const audit=new AuditService(database);const auth=new AuthService(config);const distribution=new DistributionService(repo,audit);const inventory=new InventoryService(repo,audit,config.adminPassword);const excel=new ExcelService(repo,audit);const ciot=new CiotImportService(repo,audit);const migration=new MigrationService(repo,audit);const pids=new PidService(database,audit);const deviceRequests=new WeakMap<FastifyRequest,Record<string,unknown>>()
   app.addHook('onClose',()=>database.close())
   app.addHook('onSend',async(request,reply,payload)=>{if(request.url.startsWith('/api/device/')){reply.headers({'access-control-allow-origin':'*','access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'Content-Type, Authorization','access-control-max-age':'86400'});if(request.method==='POST'&&request.url.startsWith('/api/device/authorize'))logDeviceExchange(request,reply,payload,deviceRequests.get(request))}return payload})
   app.options('/api/device/authorize',async(_,reply)=>reply.code(204).send())
@@ -45,6 +46,8 @@ export async function buildApp(config:AppConfig,database=new Database(config.dat
   app.get('/api/admin/logs',async(request)=>{const q=request.query as Record<string,string>;return {success:true,data:{items:audit.list(numberParam(q.limit,50,5,1000),q.action??'',q.search)}}})
   app.post('/api/admin/import/preview',async(request,reply)=>{try{const {buffer,fields}=await uploaded(request);return {success:true,data:excel.preview(buffer,fields.sourceBatch??fields.source_batch??'',fields.defaultPid??fields.default_pid??'')}}catch(error){return apiError(reply,error)}})
   app.post('/api/admin/import',async(request,reply)=>{try{const {buffer,fields}=await uploaded(request);return {success:true,data:excel.import(buffer,fields.sourceBatch??fields.source_batch??'',fields.defaultPid??fields.default_pid??'')}}catch(error){return apiError(reply,error)}})
+  app.post('/api/admin/ciot-import/preview',async(request,reply)=>{try{const{buffer,fields}=await uploaded(request);return{success:true,data:ciot.preview(buffer,fields.pid??'',fields.sourceBatch??fields.source_batch??'')}}catch(error){return apiError(reply,error)}})
+  app.post('/api/admin/ciot-import',async(request,reply)=>{try{const{buffer,fields}=await uploaded(request);return{success:true,data:ciot.import(buffer,fields.pid??'',fields.sourceBatch??fields.source_batch??'')}}catch(error){return apiError(reply,error)}})
   app.post('/api/admin/migrate',async(request,reply)=>{try{const {buffer}=await uploaded(request);return {success:true,data:migration.migrate(buffer)}}catch(error){return apiError(reply,error)}})
   app.get('/api/admin/export/template',async(_,reply)=>sendWorkbook(reply,excel.template(),'auth-codes-template.xlsx'))
   app.get('/api/admin/export/assigned',async(_,reply)=>sendWorkbook(reply,excel.exportAssigned(),'assigned-auth-codes.xlsx'))
