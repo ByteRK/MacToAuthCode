@@ -67,7 +67,7 @@ AuthCodePlatform --host 0.0.0.0 --port 8080 --admin-user admin --admin-password 
 
 核心接口为 `POST /api/device/authorize`：
 
-- 接收 `mac`、`pid`，兼容 JSON、URL encoded form、multipart form，并保留查询参数兜底。
+- 接收 `mac`、`pid`，兼容 JSON、URL encoded form、multipart form、URL 查询参数、纯文本键值对、简单 XML，以及非标准 Content-Type 下的 JSON；允许请求体字段覆盖查询参数。
 - MAC 会标准化；PID 之间库存严格隔离。
 - 同一 PID + MAC 已分配过时，重复请求必须返回原记录，不能再消耗库存。
 - 首次分配按记录 ID FIFO 领取该 PID 的可用库存。

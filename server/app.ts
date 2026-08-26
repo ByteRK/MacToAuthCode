@@ -54,7 +54,23 @@ export async function buildApp(config:AppConfig,database=new Database(config.dat
   return app
 }
 
-async function devicePayload(request:FastifyRequest):Promise<Record<string,unknown>>{if(request.isMultipart()){const data:Record<string,unknown>={};for await(const part of request.parts()){if(part.type==='field')data[part.fieldname]=part.value;else part.file.resume()}return data}const body=request.body;if(body&&typeof body==='object')return body as Record<string,unknown>;const query=request.query;if(query&&typeof query==='object'&&Object.keys(query as object).length)return query as Record<string,unknown>;return {}}
+async function devicePayload(request:FastifyRequest):Promise<Record<string,unknown>>{
+  const query=request.query&&typeof request.query==='object'?request.query as Record<string,unknown>:{}
+  if(request.isMultipart()){const data:Record<string,unknown>={...query};for await(const part of request.parts()){if(part.type==='field')data[part.fieldname]=part.value;else part.file.resume()}return data}
+  const body=request.body
+  if(body&&typeof body==='object')return {...query,...body as Record<string,unknown>}
+  if(typeof body==='string')return {...query,...parseDeviceText(body)}
+  return query
+}
+
+/** Keep the device boundary tolerant: embedded clients often cannot send standard JSON. */
+function parseDeviceText(body:string):Record<string,string>{
+  const text=body.trim();if(!text)return {}
+  try{const parsed=JSON.parse(text);if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))return Object.fromEntries(Object.entries(parsed).map(([key,value])=>[key,String(value??'')]))}catch{}
+  const xml:Record<string,string>={};for(const key of ['mac','pid']){const match=text.match(new RegExp(`<${key}[^>]*>([^<]*)</${key}>`,'i'));if(match)xml[key]=match[1].trim()}if(Object.keys(xml).length)return xml
+  const params=new URLSearchParams(text.replace(/\r?\n/g,'&'));if(params.has('mac')||params.has('pid'))return Object.fromEntries(params.entries())
+  const values:Record<string,string>={};for(const line of text.split(/[&\r\n]+/)){const match=line.match(/^\s*(mac|pid)\s*[:=]\s*(.*?)\s*$/i);if(match)values[match[1].toLowerCase()]=match[2]}return values
+}
 async function uploaded(request:FastifyRequest){const fields:Record<string,string>={};let buffer:Buffer|undefined;for await(const part of request.parts()){if(part.type==='file')buffer=await part.toBuffer();else fields[part.fieldname]=String(part.value)}if(!buffer)throw new Error('请选择文件');return {buffer,fields}}
 function apiError(reply:FastifyReply,error:unknown){const typed=error as Error&{details?:string[]};const message=typed.message;const conflict=message.includes('UNIQUE constraint failed');return reply.code(conflict?409:400).send({success:false,message:conflict?'同一 PID 下的 DID 不能重复':message,errors:typed.details})}
 function sendWorkbook(reply:FastifyReply,buffer:Buffer,name:string){return reply.header('content-type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').header('content-disposition',`attachment; filename="${name}"`).send(buffer)}
