@@ -5,9 +5,10 @@ export class AuditService {
     this.database.raw.prepare('INSERT INTO audit_logs(action,entity_type,entity_id,pid,mac,did,client_ip,message,snapshot_json) VALUES(?,?,?,?,?,?,?,?,?)')
       .run(data.action,data.entityType??'auth_code',data.entityId??null,data.pid??null,data.mac??null,data.did??null,data.clientIp??null,data.message,data.snapshot===undefined?null:JSON.stringify(data.snapshot))
   }
-  list(limit=50, action='all', search='') {
+  list(limit=50, actions:string[]|string='all', search='') {
     const clauses:string[]=[]; const params:string[]=[]
-    if(action!=='all'){clauses.push('action=?');params.push(action)}
+    const selected=Array.isArray(actions)?actions:actions==='all'||!actions?[]:actions.split(',').map(item=>item.trim()).filter(Boolean)
+    if(selected.length){clauses.push(`action IN (${selected.map(()=>'?').join(',')})`);params.push(...selected)}
     if(search){clauses.push('(pid LIKE ? OR mac LIKE ? OR did LIKE ?)');params.push(`%${search}%`,`%${search}%`,`%${search}%`)}
     const where=clauses.length?`WHERE ${clauses.join(' AND ')}`:''
     return this.database.raw.prepare(`SELECT id,action,entity_type entityType,entity_id entityId,pid,
