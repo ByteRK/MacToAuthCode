@@ -46,6 +46,14 @@ export class AuthCodeRepository {
     const rows=this.database.raw.prepare(`SELECT *,COALESCE((SELECT remark FROM pid_metadata WHERE pid=auth_codes.pid),'') pid_remark FROM auth_codes ${where} ORDER BY id DESC LIMIT ? OFFSET ?`).all(...params,query.pageSize,offset) as DbRow[]
     return { items: rows.map(decode), total, page:query.page, pageSize:query.pageSize }
   }
+  listAllocations(query:{page:number;pageSize:number;search?:string}):PageResult<AuthCodeRecord>{
+    const params:string[]=[];let filter=''
+    if(query.search?.trim()){const key=`%${escapeLike(query.search.trim())}%`;filter="AND (pid LIKE ? ESCAPE '\\' OR did LIKE ? ESCAPE '\\' OR assigned_mac LIKE ? ESCAPE '\\' OR payload_json LIKE ? ESCAPE '\\')";params.push(key,key,key,key)}
+    const total=Number((this.database.raw.prepare(`SELECT COUNT(*) total FROM auth_codes WHERE status='assigned' ${filter}`).get(...params) as {total:number}).total)
+    const rows=this.database.raw.prepare(`SELECT *,COALESCE((SELECT remark FROM pid_metadata WHERE pid=auth_codes.pid),'') pid_remark
+      FROM auth_codes WHERE status='assigned' ${filter} ORDER BY assigned_at DESC,id DESC LIMIT ? OFFSET ?`).all(...params,query.pageSize,(query.page-1)*query.pageSize) as DbRow[]
+    return {items:rows.map(decode),total,page:query.page,pageSize:query.pageSize}
+  }
   summary() {
     const row=this.database.raw.prepare("SELECT COUNT(*) totalCodes,COUNT(DISTINCT pid) pidCount,SUM(status='available') availableCodes,SUM(status='assigned') assignedCodes FROM auth_codes").get() as DbRow
     const requests=(this.database.raw.prepare("SELECT COUNT(*) count FROM audit_logs WHERE action IN ('assigned','reused','exhausted')").get() as {count:number}).count
