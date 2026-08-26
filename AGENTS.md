@@ -47,8 +47,10 @@ yarn package:standalone
 
 运行配置优先级固定为：命令行参数 > 环境变量 > JSON 配置文件 > 内置默认值。默认读取程序所在目录的 `config.json`，`--config <路径>` 可指定其他文件；配置字段和示例见 `config.example.json`。
 
+管理员登录密码与授权码操作密码必须独立配置。授权码编辑、删除和解除绑定的二次确认统一校验 `operationPassword`，不得回退校验管理员登录密码。
+
 ```text
-AuthCodePlatform --host 0.0.0.0 --port 8080 --admin-user admin --admin-password "your-password" --data-dir ./data
+AuthCodePlatform --host 0.0.0.0 --port 8080 --admin-user admin --admin-password "your-login-password" --operation-password "your-operation-password" --data-dir ./data
 ```
 
 对应环境变量：
@@ -57,6 +59,7 @@ AuthCodePlatform --host 0.0.0.0 --port 8080 --admin-user admin --admin-password 
 - `AUTH_PLATFORM_PORT`
 - `AUTH_PLATFORM_ADMIN_USER`
 - `AUTH_PLATFORM_ADMIN_PASSWORD`
+- `AUTH_PLATFORM_OPERATION_PASSWORD`
 - `AUTH_PLATFORM_DATA_DIR`
 - `AUTH_PLATFORM_NAME`
 - `AUTH_PLATFORM_PUBLIC_DIR`

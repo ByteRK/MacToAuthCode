@@ -5,6 +5,7 @@
   "debug": false,
   "adminUser": "admin",
   "adminPassword": "replace-with-a-strong-password",
+  "operationPassword": "replace-with-an-independent-operation-password",
   "dataDir": "./data",
   "publicDir": "./public"
 }

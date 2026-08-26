@@ -10,9 +10,9 @@ describe('runtime configuration precedence',()=>{
   const workspace=()=>{const dir=mkdtempSync(join(tmpdir(),'auth-config-test-'));dirs.push(dir);return dir}
 
   it('uses CLI over environment over config.json over defaults',()=>{
-    const dir=workspace();writeFileSync(join(dir,'config.json'),JSON.stringify({host:'file-host',port:7000,adminUser:'file-user',adminPassword:'file-pass',dataDir:'file-data'}))
-    const config=loadConfig({cwd:dir,sea:false,argv:['node','app','--host','cli-host','--port=9000','--debug'],env:{AUTH_PLATFORM_HOST:'env-host',AUTH_PLATFORM_ADMIN_USER:'env-user'}})
-    expect(config).toMatchObject({host:'cli-host',port:9000,adminUser:'env-user',adminPassword:'file-pass',dataDir:join(dir,'file-data'),debug:true})
+    const dir=workspace();writeFileSync(join(dir,'config.json'),JSON.stringify({host:'file-host',port:7000,adminUser:'file-user',adminPassword:'file-pass',operationPassword:'file-operation',dataDir:'file-data'}))
+    const config=loadConfig({cwd:dir,sea:false,argv:['node','app','--host','cli-host','--port=9000','--operation-password','cli-operation','--debug'],env:{AUTH_PLATFORM_HOST:'env-host',AUTH_PLATFORM_ADMIN_USER:'env-user',AUTH_PLATFORM_OPERATION_PASSWORD:'env-operation'}})
+    expect(config).toMatchObject({host:'cli-host',port:9000,adminUser:'env-user',adminPassword:'file-pass',operationPassword:'cli-operation',dataDir:join(dir,'file-data'),debug:true})
   })
 
   it('supports an explicit config path and resolves its paths relative to that file',()=>{
