@@ -114,7 +114,8 @@ AuthCodePlatform --host 0.0.0.0 --port 8080 --admin-user admin --admin-password 
 
 ## 9. Git 状态与维护原则
 
-- 重构分支为 `node-vue-refactor`。
+- 日常开发与后续更新统一在 `master` 分支进行；`python-refactor` 仅保存重构前的 Python 实现，`node-vue-refactor` 为已合并的历史重构分支。
+- 推送任意 Git 标签会触发 `.github/workflows/build-on-tag.yml`，在 Windows、Linux、macOS 分别构建独立发行包，并创建或更新对应 GitHub Release。
 - 如果需求存在不明确、相互冲突或会产生多种业务结果的地方，必须及时向用户确认后再实现相关部分，不要自行猜测关键业务规则。
 - 不恢复已删除的旧 Python 项目文件，除非用户明确要求查阅历史版本。
 - 提交前检查 `git diff --check`、类型检查和测试；只提交源代码及必要文档，不提交本地数据库、密钥、构建缓存或发行生成物。
