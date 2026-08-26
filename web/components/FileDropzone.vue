@@ -1,0 +1,2 @@
+<script setup lang="ts">import{ref}from'vue';import{UploadCloud}from'lucide-vue-next';const props=defineProps<{accept:string;hint:string}>();const emit=defineEmits<{change:[File|null]}>();const name=ref('');function choose(e:Event){const file=(e.target as HTMLInputElement).files?.[0]??null;name.value=file?.name??'';emit('change',file)}</script>
+<template><label class="dropzone"><UploadCloud/><strong>{{name||'点击选择文件'}}</strong><span>{{name?'文件已就绪':hint}}</span><input type="file" :accept="props.accept" @change="choose"></label></template>

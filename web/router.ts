@@ -1,0 +1,11 @@
+import { createRouter,createWebHistory } from 'vue-router'
+import LoginView from './views/LoginView.vue'
+import AppLayout from './layouts/AppLayout.vue'
+export const router=createRouter({history:createWebHistory(),routes:[{path:'/login',component:LoginView},{path:'/',component:AppLayout,children:[
+  {path:'',component:()=>import('./views/OverviewView.vue')},
+  {path:'pids',component:()=>import('./views/PidManagementView.vue')},
+  {path:'inventory',component:()=>import('./views/InventoryView.vue')},
+  {path:'import',component:()=>import('./views/ImportView.vue')},
+  {path:'logs',component:()=>import('./views/LogsView.vue')},
+  {path:'migration',component:()=>import('./views/MigrationView.vue')},
+]}]})

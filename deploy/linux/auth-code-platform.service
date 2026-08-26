@@ -1,0 +1,15 @@
+[Unit]
+Description=Auth Code Distribution Platform
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/auth-code-platform
+ExecStart=/opt/auth-code-platform/AuthCodePlatform --host 0.0.0.0 --port 8080
+Environment=AUTH_PLATFORM_ADMIN_USER=admin
+EnvironmentFile=/etc/auth-code-platform.env
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
