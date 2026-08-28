@@ -40,10 +40,12 @@ export class AdbService{
       if(!license)throw new Error('分配记录中缺少 license')
       const content=template.replaceAll('{{pid}}',pid).replaceAll('{{did}}',did).replaceAll('{{license}}',license)
       const directory=await mkdtemp(join(tmpdir(),'auth-adb-'))
-      try{const localPath=join(directory,'authorization.txt');await writeFile(localPath,content,'utf8');const pushed=await this.runner.run(['-s',serial,'push',localPath,targetPath]);this.audit.record({action:'adb_write_succeeded',pid,mac,did,clientIp:input.clientIp,message:'ADB 授权文件写入成功',snapshot:{serial,networkInterface,targetPath,output:(pushed.stdout||pushed.stderr).trim()}});return{serial,networkInterface,targetPath,pid,mac,did,license,mode:data.mode,content,output:(pushed.stdout||pushed.stderr).trim()}}
+      try{const localPath=join(directory,'authorization.txt');await writeFile(localPath,content,'utf8');const pushed=await this.runner.run(['-s',serial,'push',localPath,targetPath]);await this.runner.run(['-s',serial,'shell','sync']);const output=(pushed.stdout||pushed.stderr).trim();this.audit.record({action:'adb_write_succeeded',pid,mac,did,clientIp:input.clientIp,message:'ADB 授权文件写入并同步成功',snapshot:{serial,networkInterface,targetPath,output}});return{serial,networkInterface,targetPath,pid,mac,did,license,mode:data.mode,content,output}}
       finally{await rm(directory,{recursive:true,force:true})}
     }catch(error){const reason=this.message(error),message=did?`ADB 授权文件写入失败：${reason}；授权码已保持分配状态`:`ADB 授权文件写入失败：${reason}`;this.audit.record({action:'adb_write_failed',pid:pid||null,mac:mac||null,did:did??null,clientIp:input.clientIp,message,snapshot:{serial,networkInterface,targetPath}});throw new Error(did?`${reason}；授权码已分配并保持绑定，请处理 ADB 写入问题后重试`:reason)}
   }
+
+  async reboot(serialInput:string){const serial=serialInput.trim();if(!serial)throw new Error('请选择 ADB 设备');await this.runner.run(['-s',serial,'reboot']);return{serial,rebooting:true as const}}
 
   private parseDevices(output:string):AdbDevice[]{return output.split(/\r?\n/).slice(1).map(line=>line.trim()).filter(Boolean).map(line=>{const[serial,state,...details]=line.split(/\s+/),fields=Object.fromEntries(details.map(item=>{const index=item.indexOf(':');return index<0?[item,'']:[item.slice(0,index),item.slice(index+1)]}));return{serial,state,model:fields.model??'',product:fields.product??'',transportId:fields.transport_id??'',ready:state==='device'}})}
   private missing(error:unknown){return typeof error==='object'&&error!==null&&'code'in error&&(error as{code?:string}).code==='ENOENT'}

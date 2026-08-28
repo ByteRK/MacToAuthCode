@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import{computed,onMounted,onUnmounted,reactive,ref,watch}from'vue'
-import{ElMessage}from'element-plus'
-import{Cable,RefreshCw,Send}from'lucide-vue-next'
+import{ElMessage,ElMessageBox}from'element-plus'
+import{Cable,Power,RefreshCw,Send}from'lucide-vue-next'
 import{api,json}from'../api/client'
 import PageHeader from'../components/PageHeader.vue'
 import ContentCard from'../components/ContentCard.vue'
@@ -11,7 +11,7 @@ interface DeviceState{installed:boolean;devices:Device[];error:string}
 interface PidOption{pid:string;remark:string}
 const storageKey='auth-platform:adb-writer-settings'
 const defaults={pid:'',serial:'',networkInterface:'wlan0',targetPath:'/sdcard/license.txt',template:'pid={{pid}}\ndid={{did}}\nlicense={{license}}'}
-const form=reactive({...defaults}),devices=ref<Device[]>([]),pids=ref<PidOption[]>([]),adbInstalled=ref(true),deviceError=ref(''),checking=ref(false),writing=ref(false),statusText=ref('等待操作...')
+const form=reactive({...defaults}),devices=ref<Device[]>([]),pids=ref<PidOption[]>([]),adbInstalled=ref(true),deviceError=ref(''),checking=ref(false),writing=ref(false),rebooting=ref(false),statusText=ref('等待操作...')
 const commonInterfaces=['wlan0','eth0','usb0','rndis0','en0']
 let timer:ReturnType<typeof setInterval>|undefined
 const selectedDevice=computed(()=>devices.value.find(item=>item.serial===form.serial))
@@ -21,6 +21,7 @@ function restore(){try{const saved=JSON.parse(localStorage.getItem(storageKey)??
 async function loadPids(){pids.value=await api<PidOption[]>('/api/admin/pids/options');if(!form.pid&&pids.value.length)form.pid=pids.value[0]!.pid}
 async function checkDevices(manual=false){if(checking.value)return;checking.value=true;try{const state=await api<DeviceState>('/api/admin/adb/devices');adbInstalled.value=state.installed;devices.value=state.devices;deviceError.value=state.error;if(form.serial&&!devices.value.some(item=>item.serial===form.serial))form.serial='';if(!form.serial){const ready=devices.value.find(item=>item.ready);if(ready)form.serial=ready.serial}if(manual)appendStatus(state.error||`检测到 ${state.devices.length} 台 ADB 设备`)}catch(error){deviceError.value=(error as Error).message;if(manual)appendStatus(`设备检测失败：${deviceError.value}`)}finally{checking.value=false}}
 async function writeAuthorization(){if(!canWrite.value)return;writing.value=true;appendStatus(`开始读取设备 ${form.serial} 的 ${form.networkInterface} 网卡 MAC`);try{const result=await api<Record<string,string>>('/api/admin/adb/write',json('POST',form));appendStatus(`授权分配完成：PID=${result.pid}，MAC=${result.mac}，DID=${result.did}`);appendStatus(`已写入 ${result.targetPath}${result.output?`；ADB：${result.output}`:''}`);ElMessage.success('授权文件写入成功')}catch(error){appendStatus(`写入失败：${(error as Error).message}`);ElMessage.error((error as Error).message)}finally{writing.value=false}}
+async function rebootDevice(){if(!selectedDevice.value?.ready)return;try{await ElMessageBox.confirm(`确认重启 ADB 设备 ${form.serial}？设备会暂时断开连接。`,'确认重启设备',{confirmButtonText:'确认重启',cancelButtonText:'取消',type:'warning'});}catch{return}rebooting.value=true;try{await api('/api/admin/adb/reboot',json('POST',{serial:form.serial}));appendStatus(`已向设备 ${form.serial} 发送重启命令`);ElMessage.success('设备正在重启')}catch(error){appendStatus(`设备重启失败：${(error as Error).message}`);ElMessage.error((error as Error).message)}finally{rebooting.value=false}}
 watch(form,value=>localStorage.setItem(storageKey,JSON.stringify(value)),{deep:true})
 onMounted(async()=>{restore();await Promise.all([loadPids(),checkDevices()]);timer=setInterval(()=>checkDevices(),3000)})
 onUnmounted(()=>{if(timer)clearInterval(timer)})
@@ -28,6 +29,7 @@ onUnmounted(()=>{if(timer)clearInterval(timer)})
 
 <template>
   <PageHeader title="ADB 授权写入" description="读取 Android 设备网卡 MAC，按常规分配流程领取授权码并写入指定文件。">
+    <el-button type="danger" plain :icon="Power" :loading="rebooting" :disabled="!selectedDevice?.ready" @click="rebootDevice">重启设备</el-button>
     <el-button :icon="RefreshCw" :loading="checking" @click="checkDevices(true)">刷新设备</el-button>
   </PageHeader>
   <el-alert v-if="!adbInstalled" class="adb-alert" type="warning" show-icon :closable="false" title="运行环境未安装 ADB">
