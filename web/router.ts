@@ -7,6 +7,7 @@ export const router=createRouter({history:createWebHistory(),routes:[{path:'/log
   {path:'inventory',component:()=>import('./views/InventoryView.vue')},
   {path:'import',component:()=>import('./views/ImportView.vue')},
   {path:'ciot-import',component:()=>import('./views/CiotImportView.vue')},
+  {path:'adb-writer',component:()=>import('./views/AdbWriterView.vue')},
   {path:'allocations',component:()=>import('./views/AllocationsView.vue')},
   {path:'logs',component:()=>import('./views/LogsView.vue')},
   {path:'migration',component:()=>import('./views/MigrationView.vue')},

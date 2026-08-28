@@ -1,5 +1,5 @@
 export type CodeStatus = 'available' | 'assigned'
-export type AuditAction = 'assigned' | 'reused' | 'exhausted' | 'created' | 'updated' | 'deleted' | 'unbound' | 'imported' | 'migrated'
+export type AuditAction = 'assigned' | 'reused' | 'exhausted' | 'created' | 'updated' | 'deleted' | 'unbound' | 'imported' | 'migrated' | 'adb_write_succeeded' | 'adb_write_failed'
 
 export interface AuthCodeRecord {
   id: number

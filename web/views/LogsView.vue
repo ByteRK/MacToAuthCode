@@ -6,7 +6,7 @@ import { useAutoRefresh } from '../composables/useAutoRefresh'
 import PageHeader from '../components/PageHeader.vue'
 import ContentCard from '../components/ContentCard.vue'
 const items = ref<any[]>([]), loading = ref(false), query = reactive({ actions: [] as string[], search: '', limit: 50 })
-const labels: Record<string, string> = { assigned: '新分配', reused: '重复返回', exhausted: '库存不足', created: '新增', updated: '编辑', deleted: '删除', unbound: '解除绑定', imported: '导入', migrated: '迁移' }
+const labels: Record<string, string> = { assigned: '新分配', reused: '重复返回', exhausted: '库存不足', created: '新增', updated: '编辑', deleted: '删除', unbound: '解除绑定', imported: '导入', migrated: '迁移', adb_write_succeeded: 'ADB 写入成功', adb_write_failed: 'ADB 写入失败' }
 async function load() { loading.value = true; try { const p = new URLSearchParams({ action: query.actions.join(','), search: query.search, limit: String(query.limit) }); items.value = (await api<{ items: any[] }>('/api/admin/logs?' + p)).items } finally { loading.value = false } }
 const { autoRefresh } = useAutoRefresh(load)
 onMounted(load)

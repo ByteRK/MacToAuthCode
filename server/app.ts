@@ -16,6 +16,7 @@ import { ExcelService } from './services/excel-service.js'
 import { MigrationService } from './services/migration-service.js'
 import { PidService } from './services/pid-service.js'
 import { CiotImportService } from './services/ciot-import-service.js'
+import { AdbService } from './services/adb-service.js'
 
 const numberParam=(value:unknown,fallback:number,min=1,max=100)=>Math.min(Math.max(Number(value)||fallback,min),max)
 
@@ -23,7 +24,7 @@ export async function buildApp(config:AppConfig,database=new Database(config.dat
   const app=Fastify({logger:config.debug===true,bodyLimit:50*1024*1024});await app.register(cookie);await app.register(formbody);await app.register(multipart,{limits:{fileSize:50*1024*1024}})
   // The legacy endpoint accepted uncommon content types and then fell back to query parameters.
   app.addContentTypeParser('*',{parseAs:'string'},(_request,body,done)=>done(null,body))
-  const repo=new AuthCodeRepository(database);const audit=new AuditService(database);const auth=new AuthService(config);const distribution=new DistributionService(repo,audit);const inventory=new InventoryService(repo,audit,config.operationPassword);const excel=new ExcelService(repo,audit);const ciot=new CiotImportService(repo,audit);const migration=new MigrationService(repo,audit);const pids=new PidService(database,audit);const deviceRequests=new WeakMap<FastifyRequest,Record<string,unknown>>()
+  const repo=new AuthCodeRepository(database);const audit=new AuditService(database);const auth=new AuthService(config);const distribution=new DistributionService(repo,audit);const inventory=new InventoryService(repo,audit,config.operationPassword);const excel=new ExcelService(repo,audit);const ciot=new CiotImportService(repo,audit);const migration=new MigrationService(repo,audit);const pids=new PidService(database,audit);const adb=new AdbService(distribution,audit);const deviceRequests=new WeakMap<FastifyRequest,Record<string,unknown>>()
   app.addHook('onClose',()=>database.close())
   app.addHook('onSend',async(request,reply,payload)=>{if(request.url.startsWith('/api/device/')){reply.headers({'access-control-allow-origin':'*','access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'Content-Type, Authorization','access-control-max-age':'86400'});if(request.method==='POST'&&request.url.startsWith('/api/device/authorize'))logDeviceExchange(request,reply,payload,deviceRequests.get(request))}return payload})
   app.options('/api/device/authorize',async(_,reply)=>reply.code(204).send())
@@ -36,6 +37,7 @@ export async function buildApp(config:AppConfig,database=new Database(config.dat
   app.get('/api/admin/session',async()=>({success:true,data:{username:config.adminUser}}))
   app.get('/api/admin/overview',async()=>({success:true,data:{summary:repo.summary()}}))
   app.get('/api/admin/pids',async(request)=>{const q=request.query as Record<string,string>;return {success:true,data:pids.list({page:numberParam(q.page,1),pageSize:numberParam(q.pageSize,20),search:q.search??''})}})
+  app.get('/api/admin/pids/options',async()=>({success:true,data:pids.options()}))
   app.put('/api/admin/pids/:pid/remark',async(request,reply)=>{try{return {success:true,data:pids.updateRemark(decodeURIComponent((request.params as {pid:string}).pid),String((request.body as {remark?:string})?.remark??''))}}catch(error){return apiError(reply,error)}})
   app.get('/api/admin/codes',async(request)=>{const q=request.query as Record<string,string>;return {success:true,data:repo.list({page:numberParam(q.page,1),pageSize:numberParam(q.pageSize??q.page_size,20),search:q.search,status:q.status,pid:q.pid})}})
   app.get('/api/admin/allocations',async(request)=>{const q=request.query as Record<string,string>;return {success:true,data:repo.listAllocations({page:numberParam(q.page,1),pageSize:numberParam(q.pageSize,20),search:q.search})}})
@@ -43,6 +45,8 @@ export async function buildApp(config:AppConfig,database=new Database(config.dat
   app.put('/api/admin/codes/:id',async(request,reply)=>{try{const body=request.body as Record<string,unknown>;return {success:true,data:inventory.update(Number((request.params as {id:string}).id),body as never,String(body.password??''))}}catch(error){return apiError(reply,error)}})
   app.post('/api/admin/codes/:id/unbind',async(request,reply)=>{try{const body=request.body as {password?:string};return {success:true,data:inventory.unbind(Number((request.params as {id:string}).id),body?.password??'')}}catch(error){return apiError(reply,error)}})
   app.post('/api/admin/codes/delete',async(request,reply)=>{try{const body=request.body as {ids:number[];password:string};return {success:true,data:inventory.delete(body.ids??[],body.password??'')}}catch(error){return apiError(reply,error)}})
+  app.get('/api/admin/adb/devices',async()=>({success:true,data:await adb.devices()}))
+  app.post('/api/admin/adb/write',async(request,reply)=>{try{const body=request.body as{serial?:string;pid?:string;networkInterface?:string;targetPath?:string;template?:string};return{success:true,data:await adb.write({serial:body.serial??'',pid:body.pid??'',networkInterface:body.networkInterface??'',targetPath:body.targetPath??'',template:body.template??'',clientIp:request.ip})}}catch(error){return apiError(reply,error)}})
   app.get('/api/admin/logs',async(request)=>{const q=request.query as Record<string,string>;return {success:true,data:{items:audit.list(numberParam(q.limit,50,5,1000),q.action??'',q.search)}}})
   app.post('/api/admin/import/preview',async(request,reply)=>{try{const {buffer,fields}=await uploaded(request);return {success:true,data:excel.preview(buffer,fields.sourceBatch??fields.source_batch??'',fields.defaultPid??fields.default_pid??'')}}catch(error){return apiError(reply,error)}})
   app.post('/api/admin/import',async(request,reply)=>{try{const {buffer,fields}=await uploaded(request);return {success:true,data:excel.import(buffer,fields.sourceBatch??fields.source_batch??'',fields.defaultPid??fields.default_pid??'')}}catch(error){return apiError(reply,error)}})

@@ -15,6 +15,7 @@ export class PidService {
       GROUP BY c.pid,m.remark,m.updated_at ORDER BY c.pid COLLATE NOCASE ASC,c.pid ASC LIMIT ? OFFSET ?`).all(...params,query.pageSize,(query.page-1)*query.pageSize)
     return {items,total,page:query.page,pageSize:query.pageSize}
   }
+  options(){return this.database.raw.prepare(`SELECT c.pid,COALESCE(m.remark,'') remark FROM auth_codes c LEFT JOIN pid_metadata m ON m.pid=c.pid GROUP BY c.pid,m.remark ORDER BY c.pid COLLATE NOCASE ASC,c.pid ASC`).all() as{pid:string;remark:string}[]}
   updateRemark(pidInput:string,remarkInput:string){
     const pid=normalizePid(pidInput),remark=remarkInput.trim()
     if(!this.database.raw.prepare('SELECT 1 FROM auth_codes WHERE pid=? LIMIT 1').get(pid))throw new Error('PID 不存在')
