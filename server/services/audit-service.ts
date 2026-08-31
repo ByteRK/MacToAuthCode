@@ -1,4 +1,5 @@
 import { Database } from '../db/database.js'
+import { queryLogs } from './audit-archive-service.js'
 export class AuditService {
   constructor(private database: Database) {}
   record(data: { action:string; entityType?:string; entityId?:number|null; pid?:string|null; mac?:string|null; did?:string|null; clientIp?:string|null; message:string; snapshot?:unknown }) {
@@ -6,14 +7,6 @@ export class AuditService {
       .run(data.action,data.entityType??'auth_code',data.entityId??null,data.pid??null,data.mac??null,data.did??null,data.clientIp??null,data.message,data.snapshot===undefined?null:JSON.stringify(data.snapshot))
   }
   list(limit=50, actions:string[]|string='all', search='') {
-    const clauses:string[]=[]; const params:string[]=[]
-    const selected=Array.isArray(actions)?actions:actions==='all'||!actions?[]:actions.split(',').map(item=>item.trim()).filter(Boolean)
-    if(selected.length){clauses.push(`action IN (${selected.map(()=>'?').join(',')})`);params.push(...selected)}
-    if(search){clauses.push('(pid LIKE ? OR mac LIKE ? OR did LIKE ?)');params.push(`%${search}%`,`%${search}%`,`%${search}%`)}
-    const where=clauses.length?`WHERE ${clauses.join(' AND ')}`:''
-    return this.database.raw.prepare(`SELECT id,action,entity_type entityType,entity_id entityId,pid,
-      COALESCE((SELECT remark FROM pid_metadata WHERE pid=audit_logs.pid),'') pidRemark,
-      mac,did,client_ip clientIp,message,snapshot_json snapshotJson,created_at createdAt
-      FROM audit_logs ${where} ORDER BY id DESC LIMIT ?`).all(...params,limit)
+    return queryLogs(this.database.raw,limit,actions,search)
   }
 }

@@ -9,6 +9,7 @@ import type { AppConfig } from './config.js'
 import { Database } from './db/database.js'
 import { AuthCodeRepository } from './repositories/auth-code-repository.js'
 import { AuditService } from './services/audit-service.js'
+import { AuditArchiveService } from './services/audit-archive-service.js'
 import { AuthService } from './services/auth-service.js'
 import { DistributionService } from './services/distribution-service.js'
 import { InventoryService } from './services/inventory-service.js'
@@ -24,8 +25,10 @@ export async function buildApp(config:AppConfig,database=new Database(config.dat
   const app=Fastify({logger:config.debug===true,bodyLimit:50*1024*1024});await app.register(cookie);await app.register(formbody);await app.register(multipart,{limits:{fileSize:50*1024*1024}})
   // The legacy endpoint accepted uncommon content types and then fell back to query parameters.
   app.addContentTypeParser('*',{parseAs:'string'},(_request,body,done)=>done(null,body))
-  const repo=new AuthCodeRepository(database);const audit=new AuditService(database);const auth=new AuthService(config);const distribution=new DistributionService(repo,audit);const inventory=new InventoryService(repo,audit,config.operationPassword);const excel=new ExcelService(repo,audit);const ciot=new CiotImportService(repo,audit);const migration=new MigrationService(repo,audit);const pids=new PidService(database,audit);const adb=new AdbService(distribution,audit);const deviceRequests=new WeakMap<FastifyRequest,Record<string,unknown>>()
-  app.addHook('onClose',()=>database.close())
+  const repo=new AuthCodeRepository(database);const audit=new AuditService(database);const auditArchives=new AuditArchiveService(database,config.dataDir);const auth=new AuthService(config);const distribution=new DistributionService(repo,audit);const inventory=new InventoryService(repo,audit,config.operationPassword);const excel=new ExcelService(repo,audit);const ciot=new CiotImportService(repo,audit);const migration=new MigrationService(repo,audit);const pids=new PidService(database,audit);const adb=new AdbService(distribution,audit);const deviceRequests=new WeakMap<FastifyRequest,Record<string,unknown>>()
+  const runArchive=()=>{try{const result=auditArchives.archive();if(result.archived)console.log(`已自动归档 ${result.archived} 条审计日志。`)}catch(error){console.error('审计日志自动归档失败，主库数据未删除：',error)}}
+  runArchive();const archiveTimer=setInterval(runArchive,24*60*60*1000);archiveTimer.unref()
+  app.addHook('onClose',()=>{clearInterval(archiveTimer);database.close()})
   app.addHook('onSend',async(request,reply,payload)=>{if(request.url.startsWith('/api/device/')){reply.headers({'access-control-allow-origin':'*','access-control-allow-methods':'POST, OPTIONS','access-control-allow-headers':'Content-Type, Authorization','access-control-max-age':'86400'});if(request.method==='POST'&&request.url.startsWith('/api/device/authorize'))logDeviceExchange(request,reply,payload,deviceRequests.get(request))}return payload})
   app.options('/api/device/authorize',async(_,reply)=>reply.code(204).send())
   app.post('/api/device/authorize',async(request,reply)=>{const data=await devicePayload(request);deviceRequests.set(request,data);const mac=String(data.mac??'').trim();const pid=String(data.pid??'').trim();if(!mac)return reply.code(400).send({success:false,message:'请求体缺少 mac 字段'});if(!pid)return reply.code(400).send({success:false,message:'请求体缺少 pid 字段'});try{const result=distribution.distribute(mac,pid,request.ip);return reply.code(result.status).send(result.body)}catch(error){return reply.code(400).send({success:false,message:(error as Error).message})}})
@@ -48,7 +51,8 @@ export async function buildApp(config:AppConfig,database=new Database(config.dat
   app.get('/api/admin/adb/devices',async()=>({success:true,data:await adb.devices()}))
   app.post('/api/admin/adb/write',async(request,reply)=>{try{const body=request.body as{serial?:string;pid?:string;networkInterface?:string;targetPath?:string;template?:string};return{success:true,data:await adb.write({serial:body.serial??'',pid:body.pid??'',networkInterface:body.networkInterface??'',targetPath:body.targetPath??'',template:body.template??'',clientIp:request.ip})}}catch(error){return apiError(reply,error)}})
   app.post('/api/admin/adb/reboot',async(request,reply)=>{try{return{success:true,data:await adb.reboot(String((request.body as{serial?:string})?.serial??''))}}catch(error){return apiError(reply,error)}})
-  app.get('/api/admin/logs',async(request)=>{const q=request.query as Record<string,string>;return {success:true,data:{items:audit.list(numberParam(q.limit,50,5,1000),q.action??'',q.search)}}})
+  app.get('/api/admin/log-archives',async()=>({success:true,data:{items:auditArchives.archives()}}))
+  app.get('/api/admin/logs',async(request,reply)=>{try{const q=request.query as Record<string,string>,limit=numberParam(q.limit,50,5,1000);return {success:true,data:{items:q.archive?auditArchives.list(q.archive,limit,q.action??'',q.search):audit.list(limit,q.action??'',q.search)}}}catch(error){return apiError(reply,error)}})
   app.post('/api/admin/import/preview',async(request,reply)=>{try{const {buffer,fields}=await uploaded(request);return {success:true,data:excel.preview(buffer,fields.sourceBatch??fields.source_batch??'',fields.defaultPid??fields.default_pid??'')}}catch(error){return apiError(reply,error)}})
   app.post('/api/admin/import',async(request,reply)=>{try{const {buffer,fields}=await uploaded(request);return {success:true,data:excel.import(buffer,fields.sourceBatch??fields.source_batch??'',fields.defaultPid??fields.default_pid??'')}}catch(error){return apiError(reply,error)}})
   app.post('/api/admin/ciot-import/preview',async(request,reply)=>{try{const{buffer,fields}=await uploaded(request);return{success:true,data:ciot.preview(buffer,fields.pid??'',fields.sourceBatch??fields.source_batch??'')}}catch(error){return apiError(reply,error)}})

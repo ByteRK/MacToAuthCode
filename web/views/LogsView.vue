@@ -5,11 +5,13 @@ import { api } from '../api/client'
 import { useAutoRefresh } from '../composables/useAutoRefresh'
 import PageHeader from '../components/PageHeader.vue'
 import ContentCard from '../components/ContentCard.vue'
-const items = ref<any[]>([]), loading = ref(false), query = reactive({ actions: [] as string[], search: '', limit: 50 })
+interface ArchiveOption { file:string;label:string;count:number;oldestAt:string|null;newestAt:string|null }
+const items = ref<any[]>([]), archives = ref<ArchiveOption[]>([]), loading = ref(false), query = reactive({ archive: '', actions: [] as string[], search: '', limit: 50 })
 const labels: Record<string, string> = { assigned: '新分配', reused: '重复返回', exhausted: '库存不足', created: '新增', updated: '编辑', deleted: '删除', unbound: '解除绑定', imported: '导入', migrated: '迁移', adb_write_succeeded: 'ADB 写入成功', adb_write_failed: 'ADB 写入失败' }
-async function load() { loading.value = true; try { const p = new URLSearchParams({ action: query.actions.join(','), search: query.search, limit: String(query.limit) }); items.value = (await api<{ items: any[] }>('/api/admin/logs?' + p)).items } finally { loading.value = false } }
+async function load() { loading.value = true; try { const p = new URLSearchParams({ action: query.actions.join(','), search: query.search, limit: String(query.limit), ...(query.archive ? { archive: query.archive } : {}) }); items.value = (await api<{ items: any[] }>('/api/admin/logs?' + p)).items } finally { loading.value = false } }
+async function loadArchives(){archives.value=(await api<{items:ArchiveOption[]}>('/api/admin/log-archives')).items}
 const { autoRefresh } = useAutoRefresh(load)
-onMounted(load)
+onMounted(async()=>{await loadArchives();await load()})
 </script>
 <template>
     <PageHeader title="操作与请求记录" description="统一追踪设备分发和后台数据变更">
@@ -17,11 +19,15 @@ onMounted(load)
             <span>自动刷新</span>
             <el-switch v-model="autoRefresh" />
         </label>
-        <el-button :icon="Download" tag="a" href="/api/admin/export/logs">导出日志</el-button>
+        <el-button :icon="Download" tag="a" href="/api/admin/export/logs" :disabled="!!query.archive" :title="query.archive ? '冷数据当前仅支持只读查看' : ''">导出日志</el-button>
         <el-button type="primary" :icon="RefreshCw" @click="load">刷新记录</el-button>
     </PageHeader>
     <ContentCard>
         <div class="toolbar">
+            <el-select v-model="query.archive" class="archive-filter" @change="load">
+                <el-option label="当前日志（最近 90 天）" value="" />
+                <el-option v-for="item in archives" :key="item.file" :value="item.file" :label="`${item.label}（${item.count} 条）`" />
+            </el-select>
             <el-input v-model="query.search" :prefix-icon="Search" clearable placeholder="搜索 PID / MAC / DID"
                 @keyup.enter="load" />
             <el-select v-model="query.actions" class="action-filter" multiple clearable collapse-tags
@@ -70,6 +76,10 @@ onMounted(load)
 
 .toolbar .action-filter {
     width: 280px
+}
+
+.toolbar .archive-filter {
+    width: 250px
 }
 
 .pid-cell {
