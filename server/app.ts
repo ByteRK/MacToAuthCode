@@ -41,6 +41,8 @@ export async function buildApp(config:AppConfig,database=new Database(config.dat
   app.get('/api/admin/overview',async()=>({success:true,data:{summary:repo.summary()}}))
   app.get('/api/admin/pids',async(request)=>{const q=request.query as Record<string,string>;return {success:true,data:pids.list({page:numberParam(q.page,1),pageSize:numberParam(q.pageSize,20),search:q.search??''})}})
   app.get('/api/admin/pids/options',async()=>({success:true,data:pids.options()}))
+  app.post('/api/admin/pids/remarks/import',async(request,reply)=>{try{const{buffer}=await uploaded(request);return{success:true,data:pids.importRemarks(buffer)}}catch(error){return apiError(reply,error)}})
+  app.get('/api/admin/pids/remarks/export',async(_,reply)=>reply.header('content-type','application/json; charset=utf-8').header('content-disposition','attachment; filename="pid-remarks.json"').send(pids.exportRemarks()))
   app.put('/api/admin/pids/:pid/remark',async(request,reply)=>{try{return {success:true,data:pids.updateRemark(decodeURIComponent((request.params as {pid:string}).pid),String((request.body as {remark?:string})?.remark??''))}}catch(error){return apiError(reply,error)}})
   app.get('/api/admin/codes',async(request)=>{const q=request.query as Record<string,string>;return {success:true,data:repo.list({page:numberParam(q.page,1),pageSize:numberParam(q.pageSize??q.page_size,20),search:q.search,status:q.status,pid:q.pid})}})
   app.get('/api/admin/allocations',async(request)=>{const q=request.query as Record<string,string>;return {success:true,data:repo.listAllocations({page:numberParam(q.page,1),pageSize:numberParam(q.pageSize,20),search:q.search})}})

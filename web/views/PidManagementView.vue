@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { Eye, RefreshCw, Search, Send } from 'lucide-vue-next'
+import { Download, Eye, RefreshCw, Search, Send, Upload } from 'lucide-vue-next'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import type { PageResult } from '../../shared/contracts'
@@ -10,6 +10,7 @@ import ContentCard from '../components/ContentCard.vue'
 interface PidItem { pid: string; remark: string; totalCodes: number; availableCodes: number; assignedCodes: number; lastDataAt: string; remarkUpdatedAt: string | null }
 const items = ref<PidItem[]>([]), total = ref(0), loading = ref(false), query = reactive({ page: 1, pageSize: 20, search: '' })
 const router = useRouter(), editingPid = ref(''), remarkDraft = ref(''), applyDialog = ref(false), applyLoading = ref(false), applyPid = ref(''), applyMac = ref(''), applyResult = ref<Record<string, any> | null>(null)
+const remarkFileInput=ref<HTMLInputElement|null>(null),importingRemarks=ref(false)
 async function load() { loading.value = true; try { const p = new URLSearchParams({ page: String(query.page), pageSize: String(query.pageSize), search: query.search }); const data = await api<PageResult<PidItem>>('/api/admin/pids?' + p); items.value = data.items; total.value = data.total } finally { loading.value = false } }
 function startRemarkEdit(row: PidItem) { editingPid.value = row.pid; remarkDraft.value = row.remark }
 function cancelRemarkEdit() { editingPid.value = '' }
@@ -18,10 +19,14 @@ function showDetails(row: PidItem) { router.push({ path: '/inventory', query: { 
 function inventoryStatus(count: number) { return count === 0 ? { type: 'danger', label: '无可用库存' } : count <= 10 ? { type: 'warning', label: '库存偏低' } : { type: 'success', label: '库存充足' } }
 function openApply(row: PidItem) { applyPid.value = row.pid; applyMac.value = ''; applyResult.value = null; applyDialog.value = true }
 async function applyCode() { applyLoading.value = true; try { applyResult.value = await api('/api/device/authorize', json('POST', { pid: applyPid.value, mac: applyMac.value })); ElMessage.success('授权码申请成功'); load() } catch (error) { ElMessage.error((error as Error).message) } finally { applyLoading.value = false } }
+async function importRemarks(event:Event){const input=event.target as HTMLInputElement,file=input.files?.[0];if(!file)return;importingRemarks.value=true;try{const body=new FormData();body.append('file',file);const result=await api<{total:number;created:number;updated:number;unchanged:number}>('/api/admin/pids/remarks/import',{method:'POST',body});ElMessage.success(`导入完成：新增 ${result.created}，更新 ${result.updated}，未变化 ${result.unchanged}`);query.page=1;await load()}catch(error){const typed=error as Error&{details?:string[]};ElMessage.error(typed.details?.[0]??typed.message)}finally{input.value='';importingRemarks.value=false}}
 onMounted(load)
 </script>
 <template>
   <PageHeader title="PID 清单" description="查看系统中的产品 PID、库存分布和产品备注。点击备注即可直接编辑">
+    <input ref="remarkFileInput" class="hidden-file" type="file" accept="application/json,.json" @change="importRemarks">
+    <el-button :icon="Upload" :loading="importingRemarks" @click="remarkFileInput?.click()">导入产品备注</el-button>
+    <el-button :icon="Download" tag="a" href="/api/admin/pids/remarks/export">导出产品备注</el-button>
     <el-button :icon="RefreshCw" @click="load">刷新</el-button>
   </PageHeader>
   <ContentCard>
@@ -99,6 +104,10 @@ onMounted(load)
   color: #385064;
   text-align: left;
   cursor: text
+}
+
+.hidden-file {
+  display: none
 }
 
 .remark-editor:hover {
