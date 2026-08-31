@@ -43,6 +43,6 @@ export class ProductionCounterService {
   }
   private record(action:string,label:string,counter:ReturnType<typeof decode>){
     const note=counter.note||'无'
-    this.audit.record({action,entityType:'production_counter',pid:counter.pid,message:`${label}；实时：${counter.count}；目标：${counter.targetCount}；备注：${note}`,snapshot:{count:counter.count,targetCount:counter.targetCount,note:counter.note}})
+    this.audit.record({action,entityType:'production_counter',pid:counter.pid,message:`${label}；实时数量：${counter.count}；目标数量：${counter.targetCount}；备注：${note}`,snapshot:{count:counter.count,targetCount:counter.targetCount,note:counter.note}})
   }
 }
