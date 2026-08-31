@@ -18,6 +18,7 @@ import { MigrationService } from './services/migration-service.js'
 import { PidService } from './services/pid-service.js'
 import { CiotImportService } from './services/ciot-import-service.js'
 import { AdbService } from './services/adb-service.js'
+import { ProductionCounterService } from './services/production-counter-service.js'
 
 const numberParam=(value:unknown,fallback:number,min=1,max=100)=>Math.min(Math.max(Number(value)||fallback,min),max)
 
@@ -25,7 +26,7 @@ export async function buildApp(config:AppConfig,database=new Database(config.dat
   const app=Fastify({logger:config.debug===true,bodyLimit:50*1024*1024});await app.register(cookie);await app.register(formbody);await app.register(multipart,{limits:{fileSize:50*1024*1024}})
   // The legacy endpoint accepted uncommon content types and then fell back to query parameters.
   app.addContentTypeParser('*',{parseAs:'string'},(_request,body,done)=>done(null,body))
-  const repo=new AuthCodeRepository(database);const audit=new AuditService(database);const auditArchives=new AuditArchiveService(database,config.dataDir);const auth=new AuthService(config);const distribution=new DistributionService(repo,audit);const inventory=new InventoryService(repo,audit,config.operationPassword);const excel=new ExcelService(repo,audit);const ciot=new CiotImportService(repo,audit);const migration=new MigrationService(repo,audit);const pids=new PidService(database,audit);const adb=new AdbService(distribution,audit);const deviceRequests=new WeakMap<FastifyRequest,Record<string,unknown>>()
+  const repo=new AuthCodeRepository(database);const audit=new AuditService(database);const auditArchives=new AuditArchiveService(database,config.dataDir);const auth=new AuthService(config);const productionCounters=new ProductionCounterService(database,audit);const distribution=new DistributionService(repo,audit,productionCounters);const inventory=new InventoryService(repo,audit,config.operationPassword);const excel=new ExcelService(repo,audit);const ciot=new CiotImportService(repo,audit);const migration=new MigrationService(repo,audit);const pids=new PidService(database,audit);const adb=new AdbService(distribution,audit);const deviceRequests=new WeakMap<FastifyRequest,Record<string,unknown>>()
   const runArchive=()=>{try{const result=auditArchives.archive();if(result.archived)console.log(`已自动归档 ${result.archived} 条审计日志。`)}catch(error){console.error('审计日志自动归档失败，主库数据未删除：',error)}}
   runArchive();const archiveTimer=setInterval(runArchive,24*60*60*1000);archiveTimer.unref()
   app.addHook('onClose',()=>{clearInterval(archiveTimer);database.close()})
@@ -38,7 +39,10 @@ export async function buildApp(config:AppConfig,database=new Database(config.dat
   app.post('/api/admin/logout',async(_,reply)=>{reply.clearCookie('auth_session',{path:'/'});return {success:true}})
   app.addHook('preHandler',async(request,reply)=>{if(request.url.startsWith('/api/admin/')&&!request.url.startsWith('/api/admin/login')&&!auth.verify(request.cookies.auth_session))return reply.code(401).send({success:false,message:'未登录或登录已失效'})})
   app.get('/api/admin/session',async()=>({success:true,data:{username:config.adminUser}}))
-  app.get('/api/admin/overview',async()=>({success:true,data:{summary:repo.summary()}}))
+  app.get('/api/admin/overview',async()=>({success:true,data:{summary:repo.summary(),activeProductionCounters:productionCounters.activeSummary()}}))
+  app.get('/api/admin/production-counters',async()=>({success:true,data:{items:productionCounters.list()}}))
+  app.post('/api/admin/production-counters/start',async(request,reply)=>{try{const body=request.body as{pid?:string;targetCount?:number;note?:string};return{success:true,data:productionCounters.start(String(body?.pid??''),Number(body?.targetCount),String(body?.note??''))}}catch(error){return apiError(reply,error)}})
+  app.delete('/api/admin/production-counters/:pid',async(request,reply)=>{try{return{success:true,data:productionCounters.cancel(decodeURIComponent((request.params as{pid:string}).pid))}}catch(error){return apiError(reply,error)}})
   app.get('/api/admin/pids',async(request)=>{const q=request.query as Record<string,string>;return {success:true,data:pids.list({page:numberParam(q.page,1),pageSize:numberParam(q.pageSize,20),search:q.search??''})}})
   app.get('/api/admin/pids/options',async()=>({success:true,data:pids.options()}))
   app.post('/api/admin/pids/remarks/import',async(request,reply)=>{try{const{buffer}=await uploaded(request);return{success:true,data:pids.importRemarks(buffer)}}catch(error){return apiError(reply,error)}})

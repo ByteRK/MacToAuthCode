@@ -22,6 +22,17 @@ CREATE TABLE IF NOT EXISTS pid_metadata (
   remark TEXT NOT NULL DEFAULT '',
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS production_counters (
+  pid TEXT PRIMARY KEY,
+  count INTEGER NOT NULL DEFAULT 0 CHECK(count >= 0),
+  target_count INTEGER NOT NULL DEFAULT 1 CHECK(target_count > 0),
+  note TEXT NOT NULL DEFAULT '',
+  active INTEGER NOT NULL DEFAULT 0 CHECK(active IN (0,1)),
+  started_at TEXT,
+  stopped_at TEXT,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_production_counters_active ON production_counters(active, pid COLLATE NOCASE);
 CREATE TABLE IF NOT EXISTS audit_logs (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   action TEXT NOT NULL,
@@ -46,6 +57,10 @@ export class Database {
     this.raw = new DatabaseSync(path)
     this.raw.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=30000;')
     this.raw.exec(SCHEMA)
+    // CREATE TABLE IF NOT EXISTS does not add new columns to databases created by an older build.
+    const counterColumns=new Set((this.raw.prepare('PRAGMA table_info(production_counters)').all() as {name:string}[]).map(column=>column.name))
+    if(!counterColumns.has('target_count'))this.raw.exec('ALTER TABLE production_counters ADD COLUMN target_count INTEGER NOT NULL DEFAULT 1 CHECK(target_count > 0)')
+    if(!counterColumns.has('note'))this.raw.exec("ALTER TABLE production_counters ADD COLUMN note TEXT NOT NULL DEFAULT ''")
   }
   transaction<T>(work: () => T): T {
     this.raw.exec('BEGIN IMMEDIATE')

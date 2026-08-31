@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { computed } from 'vue'
 import { Download, RefreshCw, Search } from 'lucide-vue-next'
 import { api } from '../api/client'
 import { useAutoRefresh } from '../composables/useAutoRefresh'
@@ -7,7 +8,8 @@ import PageHeader from '../components/PageHeader.vue'
 import ContentCard from '../components/ContentCard.vue'
 interface ArchiveOption { file:string;label:string;count:number;oldestAt:string|null;newestAt:string|null }
 const items = ref<any[]>([]), archives = ref<ArchiveOption[]>([]), loading = ref(false), query = reactive({ archive: '', actions: [] as string[], search: '', limit: 50 })
-const labels: Record<string, string> = { assigned: '新分配', reused: '重复返回', exhausted: '库存不足', created: '新增', updated: '编辑', deleted: '删除', unbound: '解除绑定', imported: '导入', migrated: '迁移', adb_write_succeeded: 'ADB 写入成功', adb_write_failed: 'ADB 写入失败' }
+const labels: Record<string, string> = { assigned: '新分配', reused: '重复返回', exhausted: '库存不足', created: '新增', updated: '编辑', deleted: '删除', unbound: '解除绑定', imported: '导入', migrated: '迁移', adb_write_succeeded: 'ADB 写入成功', adb_write_failed: 'ADB 写入失败', production_counter_started: '启动生产计数', production_counter_stopped: '关闭生产计数', production_counter_reset: '复位生产计数', production_counter_cancelled: '取消生产计数' }
+const actionOptions=computed(()=>Object.entries(labels).filter(([key])=>!['production_counter_stopped','production_counter_reset'].includes(key)))
 async function load() { loading.value = true; try { const p = new URLSearchParams({ action: query.actions.join(','), search: query.search, limit: String(query.limit), ...(query.archive ? { archive: query.archive } : {}) }); items.value = (await api<{ items: any[] }>('/api/admin/logs?' + p)).items } finally { loading.value = false } }
 async function loadArchives(){archives.value=(await api<{items:ArchiveOption[]}>('/api/admin/log-archives')).items}
 const { autoRefresh } = useAutoRefresh(load)
@@ -32,7 +34,7 @@ onMounted(async()=>{await loadArchives();await load()})
                 @keyup.enter="load" />
             <el-select v-model="query.actions" class="action-filter" multiple clearable collapse-tags
                 collapse-tags-tooltip :max-collapse-tags="2" placeholder="全部动作" @change="load">
-                <el-option v-for="(label, key) in labels" :key="key" :label="label" :value="key" />
+                <el-option v-for="[key, label] in actionOptions" :key="key" :label="label" :value="key" />
             </el-select>
             <el-select v-model="query.limit" @change="load">
                 <el-option :value="20" label="最近 20 条" />
@@ -44,8 +46,8 @@ onMounted(async()=>{await loadArchives();await load()})
             <el-table-column label="序号" width="70" align="center">
                 <template #default="{ $index }">{{ $index + 1 }}</template>
             </el-table-column>
-            <el-table-column prop="createdAt" label="时间" min-width="165" />
-            <el-table-column label="动作" width="110">
+            <el-table-column prop="createdAt" label="时间" min-width="150" />
+            <el-table-column label="动作" min-width="125">
                 <template #default="{ row }">
                     <el-tag effect="plain">{{ labels[row.action] || row.action }}</el-tag>
                 </template>
