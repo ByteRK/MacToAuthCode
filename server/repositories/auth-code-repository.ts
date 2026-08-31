@@ -20,6 +20,10 @@ export class AuthCodeRepository {
     const row=this.database.raw.prepare('SELECT * FROM auth_codes WHERE pid=? AND did=? LIMIT 1').get(pid,did) as DbRow|undefined
     return row?decode(row):null
   }
+  findPidDidConflict(pid:string,did:string,excludeId:number) {
+    const row=this.database.raw.prepare('SELECT * FROM auth_codes WHERE pid=? AND did=? AND id<>? LIMIT 1').get(pid,did,excludeId) as DbRow|undefined
+    return row?decode(row):null
+  }
   claimNext(pid: string, mac: string) {
     const row = this.database.raw.prepare("SELECT id FROM auth_codes WHERE pid=? AND status='available' ORDER BY id LIMIT 1").get(pid) as { id: number } | undefined
     if (!row) return null

@@ -82,7 +82,7 @@ onMounted(load)
       <el-table-column label="操作" width="210" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
-            <el-button size="small" type="primary" plain :icon="Pencil" @click="openEdit(row)">编辑</el-button>
+            <el-button v-if="row.status === 'available'" size="small" type="primary" plain :icon="Pencil" @click="openEdit(row)">编辑</el-button>
             <el-button v-if="row.status === 'assigned'" size="small" type="danger" plain :icon="Unlink"
               @click="confirmUnbind(row)">解除绑定</el-button>
           </div>

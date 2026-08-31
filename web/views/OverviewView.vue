@@ -6,6 +6,8 @@ import PageHeader from '../components/PageHeader.vue'
 import ContentCard from '../components/ContentCard.vue'
 const summary = ref<Record<string, number>>({}), loading = ref(false)
 const cards = [['PID 数量', 'pidCount', Boxes], ['授权记录总数', 'totalCodes', PackageCheck], ['可分配库存', 'availableCodes', PackageOpen], ['已分配数量', 'assignedCodes', RadioTower], ['累计授权请求', 'distributionRequests', RefreshCw]] as const
+const appVersion = __APP_VERSION__
+const buildTime = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'medium', hour12: false }).format(new Date(__BUILD_TIME__))
 async function load() { loading.value = true; try { summary.value = (await api<{ summary: Record<string, number> }>('/api/admin/overview')).summary } finally { loading.value = false } }
 onMounted(load)
 </script>
@@ -32,4 +34,13 @@ onMounted(load)
             <span>请求字段：mac、pid</span>
         </div>
     </ContentCard>
+    <footer class="build-info">授权码平台 v{{ appVersion }} · 编译时间：{{ buildTime }}</footer>
 </template>
+<style scoped>
+.build-info {
+    padding: 18px 4px 4px;
+    color: #8a9aa5;
+    font-size: 12px;
+    text-align: center
+}
+</style>
