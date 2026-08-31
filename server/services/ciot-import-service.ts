@@ -21,6 +21,9 @@ export class CiotImportService{
     if(invalidStatuses.length)throw new Error(`存在 ${invalidStatuses.length} 条非“未激活”数据，已拒绝整次导入`)
     return this.repo.database.transaction(()=>{const{valid,duplicates}=this.partition(rows);for(const item of valid){const record=this.repo.create(item);this.audit.record({action:'imported',entityId:record.id,pid:record.pid,did:record.did,message:'CIOT 源导入授权码'})}return{ok:true as const,totalRows:rows.length,inserted:valid.length,skipped:duplicates.length,sourceBatch:batch,duplicates}})
   }
+  conversionPreview(buffer:Buffer,pidInput:string){const{rows}=this.parse(buffer,pidInput,'');const invalidStatuses=this.invalidStatuses(rows);return{totalRows:rows.length,statusValid:invalidStatuses.length===0,invalidStatuses}}
+  /** Pure format conversion: deliberately avoids inventory lookup, mutation and audit logging. */
+  convert(buffer:Buffer,pidInput:string){const{rows}=this.parse(buffer,pidInput,'');const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,XLSX.utils.json_to_sheet(rows.map(item=>({pid:item.pid,did:item.did,license:item.license})),{header:['pid','did','license']}),'auth_codes');return XLSX.write(book,{type:'buffer',bookType:'xlsx'})as Buffer}
   private parse(buffer:Buffer,pidInput:string,sourceBatch:string){
     const pid=normalizePid(pidInput),book=XLSX.read(buffer,{type:'buffer'}),sheet=book.Sheets[book.SheetNames[0]]
     if(!sheet)throw new Error('Excel 中没有工作表')

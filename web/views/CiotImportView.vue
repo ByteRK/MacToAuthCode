@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { CloudDownload } from 'lucide-vue-next'
+import { CloudDownload, Download } from 'lucide-vue-next'
 import { api } from '../api/client'
 import PageHeader from '../components/PageHeader.vue'
 import ContentCard from '../components/ContentCard.vue'
@@ -11,9 +11,10 @@ interface DuplicateRow { row: number; pid: string; did: string; duplicateWith: '
 interface InvalidStatus { row: number; did: string; status: string }
 interface Preview { statusValid: boolean; totalRows: number; validCount: number; duplicateCount: number; sourceBatch: string; duplicates: DuplicateRow[]; invalidStatuses: InvalidStatus[] }
 interface Result { ok: boolean; totalRows: number; inserted: number; skipped: number; sourceBatch: string; duplicates: DuplicateRow[] }
+interface ConversionPreview { totalRows: number; statusValid: boolean; invalidStatuses: InvalidStatus[] }
 
-const file = ref<File | null>(null), pid = ref(''), sourceBatch = ref(''), loading = ref(false), result = ref<Result | null>(null), errors = ref<string[]>([])
-const preview = ref<Preview | null>(null), duplicateDialog = ref(false), statusDialog = ref(false)
+const file = ref<File | null>(null), pid = ref(''), sourceBatch = ref(''), loading = ref(false), converting = ref(false), result = ref<Result | null>(null), errors = ref<string[]>([])
+const preview = ref<Preview | null>(null), conversionPreview = ref<ConversionPreview | null>(null), duplicateDialog = ref(false), statusDialog = ref(false), conversionDialog = ref(false)
 function formData() { const data = new FormData(); data.append('file', file.value!); data.append('pid', pid.value.trim()); data.append('sourceBatch', sourceBatch.value); return data }
 async function inspect() {
   if (!file.value) return ElMessage.warning('请选择 CIOT Excel 文件')
@@ -23,6 +24,8 @@ async function inspect() {
   catch (error) { errors.value = (error as Error & { details?: string[] }).details ?? []; ElMessage.error((error as Error).message) } finally { loading.value = false }
 }
 async function confirmImport() { if (!file.value || !pid.value.trim()) return; loading.value = true; try { const imported = await api<Result>('/api/admin/ciot-import', { method: 'POST', body: formData() }); result.value = imported; duplicateDialog.value = false; ElMessage.success(`成功导入 ${imported.inserted} 条 CIOT 授权码`) } catch (error) { errors.value = (error as Error & { details?: string[] }).details ?? []; ElMessage.error((error as Error).message) } finally { loading.value = false } }
+async function inspectConversion(){if(!file.value)return ElMessage.warning('请选择 CIOT Excel 文件');if(!pid.value.trim())return ElMessage.warning('PID 为必填项');converting.value=true;try{const inspected=await api<ConversionPreview>('/api/admin/ciot-import/convert-preview',{method:'POST',body:formData()});conversionPreview.value=inspected;if(!inspected.statusValid){conversionDialog.value=true;return}await downloadConverted()}catch(error){ElMessage.error((error as Error).message)}finally{converting.value=false}}
+async function downloadConverted(){if(!file.value||!pid.value.trim())return;converting.value=true;try{const response=await fetch('/api/admin/ciot-import/convert',{method:'POST',body:formData()});if(response.status===401){location.href='/login';throw new Error('登录已失效')}if(!response.ok){const payload=await response.json();throw new Error(payload.message||'转换导出失败')}const blob=await response.blob(),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='ciot-batch-import.xlsx';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),0);conversionDialog.value=false;ElMessage.success(`已转换并导出 ${conversionPreview.value?.totalRows??0} 条数据`)}catch(error){ElMessage.error((error as Error).message)}finally{converting.value=false}}
 </script>
 
 <template>
@@ -40,8 +43,8 @@ async function confirmImport() { if (!file.value || !pid.value.trim()) return; l
               <el-input v-model="sourceBatch" placeholder="留空则自动生成，如 20260826_1243" />
             </el-form-item>
           </div>
-          <el-button type="primary" :icon="CloudDownload" :loading="loading" :disabled="!file || !pid.trim()"
-            @click="inspect">检查并导入</el-button>
+          <div class="action-row"><el-button type="primary" :icon="CloudDownload" :loading="loading" :disabled="!file || !pid.trim()"
+            @click="inspect">检查并导入</el-button><el-button :icon="Download" :loading="converting" :disabled="!file || !pid.trim()" @click="inspectConversion">转换为批量导入格式</el-button></div>
         </el-form>
       </div>
       <div class="result-panel">
@@ -109,10 +112,17 @@ async function confirmImport() { if (!file.value || !pid.value.trim()) return; l
         条</el-button>
     </template>
   </el-dialog>
+
+  <el-dialog v-model="conversionDialog" title="转换文件包含状态异常记录" width="700" :close-on-click-modal="false">
+    <el-alert type="warning" show-icon :closable="false" :title="`发现 ${conversionPreview?.invalidStatuses.length??0} 条非“未激活”记录`" description="转换操作不会导入数据，也不会修改数据库。继续后仍会转换文件中的全部记录。"/>
+    <el-table class="check-table" :data="conversionPreview?.invalidStatuses??[]" max-height="360"><el-table-column label="序号" width="70" align="center"><template #default="{$index}">{{$index+1}}</template></el-table-column><el-table-column prop="row" label="Excel 行" width="100"/><el-table-column prop="did" label="sn码" min-width="220"/><el-table-column prop="status" label="源状态" min-width="140"><template #default="{row}"><el-tag type="warning">{{row.status}}</el-tag></template></el-table-column></el-table>
+    <template #footer><el-button @click="conversionDialog=false">取消</el-button><el-button type="primary" :icon="Download" :loading="converting" @click="downloadConverted">仍然转换全部记录</el-button></template>
+  </el-dialog>
 </template>
 
 <style scoped>
 .check-table {
   margin-top: 18px
 }
+.action-row{display:flex;gap:10px;flex-wrap:wrap}
 </style>
