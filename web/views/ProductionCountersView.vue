@@ -5,6 +5,7 @@ import {ElMessage,ElMessageBox} from 'element-plus'
 import {api,json} from '../api/client'
 import PageHeader from '../components/PageHeader.vue'
 import ContentCard from '../components/ContentCard.vue'
+import { formatDateTime } from '../utils/time'
 
 interface Counter{pid:string;remark:string;count:number;targetCount:number;note:string;active:boolean;startedAt:string|null;stoppedAt:string|null;updatedAt:string}
 interface PidOption{pid:string;remark:string}
@@ -17,7 +18,6 @@ function openStart(){startForm.value={pid:'',targetCount:1,note:''};startDialog.
 async function start(){const form=startForm.value;if(!form.pid||!Number.isInteger(form.targetCount)||form.targetCount<=0||!form.note.trim())return;acting.value='start';try{await api('/api/admin/production-counters/start',json('POST',form));ElMessage.success('生产计数已启动');startDialog.value=false;await load()}catch(error){ElMessage.error((error as Error).message)}finally{acting.value=''}}
 async function cancel(row:Counter){try{await ElMessageBox.confirm(`将永久删除 ${row.pid} 的计数任务及当前进度，此操作无法恢复。`,'取消生产计数',{type:'warning',confirmButtonText:'确认取消并删除',cancelButtonText:'返回'})}catch{return}acting.value=`cancel:${row.pid}`;try{await api(`/api/admin/production-counters/${encodeURIComponent(row.pid)}`,{method:'DELETE'});ElMessage.success('计数任务及进度已删除');await load()}catch(error){ElMessage.error((error as Error).message)}finally{acting.value=''}}
 const percentage=(row:Counter)=>Math.min(100,Math.round(row.count/row.targetCount*100))
-function format(value:string|null){return value?new Intl.DateTimeFormat('zh-CN',{dateStyle:'medium',timeStyle:'medium',hour12:false}).format(new Date(value.replace(' ','T')+'Z')):'—'}
 async function initialize(){const [pidData]=await Promise.all([api<PidOption[]>('/api/admin/pids/options'),load()]);options.value=pidData;timer=window.setInterval(()=>{if(document.visibilityState==='visible')void load(true)},2000)}
 function visible(){if(document.visibilityState==='visible')void load(true)}
 onMounted(()=>{void initialize();document.addEventListener('visibilitychange',visible)})
@@ -42,7 +42,7 @@ onBeforeUnmount(()=>{if(timer)clearInterval(timer);document.removeEventListener(
       <el-table-column label="本轮已分发" min-width="145" align="center"><template #default="{row}"><strong class="counter-value">{{row.count}}</strong></template></el-table-column>
       <el-table-column label="目标与进度" min-width="250"><template #default="{row}"><div class="progress-cell"><div><span>{{row.count}} / {{row.targetCount}}</span><span v-if="row.count>row.targetCount" class="over-target">超出 {{row.count-row.targetCount}}</span></div><el-progress :percentage="percentage(row)" :status="row.count>=row.targetCount?'success':undefined"/></div></template></el-table-column>
       <el-table-column prop="note" label="生产备注" min-width="180" show-overflow-tooltip/>
-      <el-table-column label="本次启动时间" min-width="180"><template #default="{row}">{{format(row.startedAt)}}</template></el-table-column>
+      <el-table-column label="本次启动时间" min-width="180"><template #default="{row}">{{formatDateTime(row.startedAt)}}</template></el-table-column>
       <el-table-column label="操作" width="135" fixed="right"><template #default="{row}"><div class="table-actions">
         <el-button size="small" type="danger" :icon="Trash2" :loading="acting===`cancel:${row.pid}`" @click="cancel(row)">取消计数</el-button>
       </div></template></el-table-column>

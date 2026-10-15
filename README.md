@@ -41,7 +41,7 @@ yarn build
 ## 启动参数
 
 ```bash
-AuthCodePlatform --config ./config.json --host 0.0.0.0 --port 8080 --admin-user admin --admin-password "your-login-password" --operation-password "your-operation-password" --data-dir ./data
+AuthCodePlatform --config ./config.json --host 0.0.0.0 --port 8080 --admin-user admin --admin-password "your-login-password" --operation-password "your-operation-password" --data-dir ./data --timezone Asia/Shanghai
 ```
 
 对应环境变量：
@@ -55,12 +55,19 @@ AuthCodePlatform --config ./config.json --host 0.0.0.0 --port 8080 --admin-user 
 - `AUTH_PLATFORM_NAME`
 - `AUTH_PLATFORM_PUBLIC_DIR`
 - `AUTH_PLATFORM_DEBUG`
+- `AUTH_PLATFORM_TIMEZONE`
 
 默认读取程序所在目录的 `config.json`，也可通过 `--config <路径>` 指定文件。字段参考 `config.example.json`。配置文件中的相对数据和 Web 目录以配置文件所在目录为基准；显式指定但不存在或格式错误时，程序会拒绝启动。
 
 优先级为命令行参数、环境变量、JSON 配置文件、内置默认值。管理员登录密码与授权码操作密码互相独立；编辑、删除和解除绑定使用操作密码进行二次确认。生产环境必须分别设置强密码。管理后台仅使用 HTTP，适用于可信局域网。
 
 默认仅在终端格式化打印 `/api/device/authorize` 的完整请求和完整响应。传入 `--debug`（或设置 `AUTH_PLATFORM_DEBUG=true`、配置文件 `"debug": true`）后，额外启用全部 HTTP 请求的 Fastify 调试日志。
+
+## 时间与时区
+
+数据库、审计归档和设备接口中的时间统一以 UTC 存储（`YYYY-MM-DD HH:MM:SS`），保证排序、按月份归档和接口兼容行为不随部署环境改变。管理后台页面、终端日志和 Excel 导出会把时间转换为同一个显示时区，保证三处看到的时刻完全一致。
+
+显示时区默认取服务器操作系统的本地时区；当服务器时区不是实际业务时区（例如 Linux 容器或服务默认使用 UTC）时，通过 `--timezone`、`AUTH_PLATFORM_TIMEZONE` 或配置文件 `"timezone"` 指定 IANA 时区名覆盖，例如 `Asia/Shanghai`。填写空字符串表示继续使用系统时区；填写无效时区名时程序会拒绝启动。
 
 ## ADB 授权写入
 

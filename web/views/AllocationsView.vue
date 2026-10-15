@@ -6,6 +6,7 @@ import { api } from '../api/client'
 import { useAutoRefresh } from '../composables/useAutoRefresh'
 import PageHeader from '../components/PageHeader.vue'
 import ContentCard from '../components/ContentCard.vue'
+import { formatDateTime } from '../utils/time'
 const items = ref<AuthCodeRecord[]>([]), total = ref(0), loading = ref(false), payloadDialog = ref(false), payloadTitle = ref(''), payloadText = ref('')
 const query = reactive({ page: 1, pageSize: 20, search: '' })
 async function load() { loading.value = true; try { const p = new URLSearchParams({ page: String(query.page), pageSize: String(query.pageSize), search: query.search }); const data = await api<PageResult<AuthCodeRecord>>('/api/admin/allocations?' + p); items.value = data.items; total.value = data.total } finally { loading.value = false } }
@@ -52,7 +53,9 @@ onMounted(load)
       <el-table-column prop="sourceBatch" label="批次" min-width="120">
         <template #default="{ row }">{{ row.sourceBatch || '-' }}</template>
       </el-table-column>
-      <el-table-column prop="assignedAt" label="分配时间" min-width="165" sortable />
+      <el-table-column prop="assignedAt" label="分配时间" min-width="165" sortable>
+        <template #default="{ row }">{{ formatDateTime(row.assignedAt) }}</template>
+      </el-table-column>
       <el-table-column label="操作" width="132" fixed="right">
         <template #default="{ row }">
           <el-button size="small" type="primary" plain :icon="Eye" @click="showPayload(row)">查看载荷</el-button>

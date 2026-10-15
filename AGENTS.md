@@ -50,7 +50,7 @@ yarn package:standalone
 管理员登录密码与授权码操作密码必须独立配置。授权码编辑、删除和解除绑定的二次确认统一校验 `operationPassword`，不得回退校验管理员登录密码。
 
 ```text
-AuthCodePlatform --host 0.0.0.0 --port 8080 --admin-user admin --admin-password "your-login-password" --operation-password "your-operation-password" --data-dir ./data
+AuthCodePlatform --host 0.0.0.0 --port 8080 --admin-user admin --admin-password "your-login-password" --operation-password "your-operation-password" --data-dir ./data --timezone Asia/Shanghai
 ```
 
 对应环境变量：
@@ -64,8 +64,11 @@ AuthCodePlatform --host 0.0.0.0 --port 8080 --admin-user admin --admin-password 
 - `AUTH_PLATFORM_NAME`
 - `AUTH_PLATFORM_PUBLIC_DIR`
 - `AUTH_PLATFORM_DEBUG`
+- `AUTH_PLATFORM_TIMEZONE`
 
 默认关闭 Fastify 全量访问日志，只格式化打印 `/api/device/authorize` 的完整请求与响应。`--debug`、`AUTH_PLATFORM_DEBUG=true` 或配置文件 `debug: true` 会启用全部 Web 请求日志，仍遵循统一配置优先级。
+
+时间处理固定为“存储 UTC、展示本地”：数据库、审计归档、Excel 存储字段和设备接口中的时间始终为 UTC 文本 `YYYY-MM-DD HH:MM:SS`（`CURRENT_TIMESTAMP` 语义），不得写入本地时间。管理后台页面、终端日志和 Excel 导出统一转换为同一个显示时区，时区由服务端解析（`server/domain/time.ts`）并通过 `/api/admin/time` 下发给前端，前端一律使用 `web/utils/time.ts` 渲染，不得直接展示原始时间字符串。显示时区默认取服务器系统时区，`--timezone`、`AUTH_PLATFORM_TIMEZONE` 或配置文件 `timezone` 可用 IANA 时区名覆盖（空值表示跟随系统，非法时区名拒绝启动）。批次名 `yyyyMMdd_HHmm` 也按该时区生成。
 
 默认监听 `0.0.0.0:8080`。若请求端口因占用或 Windows 保留端口而返回 `EADDRINUSE`/`EACCES`，服务会从该端口向上逐个尝试，并在启动日志中打印本机所有可访问 IP 和最终端口。管理后台直接访问其中任一 URL。
 
@@ -112,6 +115,7 @@ AuthCodePlatform --host 0.0.0.0 --port 8080 --admin-user admin --admin-password 
 - 所有数据表格首列统一显示“序号”；分页表格按页码和每页数量计算连续序号，无分页表格按当前展示顺序编号。
 - 授权码管理的 PID、状态、搜索词、页码和每页数量必须同步到 URL，数据编辑、解除绑定、删除和浏览器刷新后不得丢失筛选上下文；删除弹窗打开时必须锁定待删除 ID 快照，不能依赖后续可能变化的表格选中状态。
 - 页面按路由动态导入，避免重新引入大体积单包警告。
+- 任何时间展示都必须经过 `web/utils/time.ts`（`formatDateTime` / `formatDate` / `formatTimeOfDay`）转换，禁止在模板里直接绑定后端返回的 UTC 时间字段。
 - 业务按配置、路由/应用组装、服务、仓储、数据库、硬件适配层拆分。新增功能应进入对应职责文件，不要堆入单一入口。
 - 对接口兼容、事务边界、端口回退、硬件适配等关键决策添加说明性注释；避免注释显而易见的语法。
 

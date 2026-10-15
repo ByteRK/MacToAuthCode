@@ -1,14 +1,17 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { isSea as runtimeIsSea } from 'node:sea'
+import { resolveTimeZone } from './domain/time.js'
 
 export interface AppConfig {
   appName: string; host: string; port: number; adminUser: string; adminPassword: string; operationPassword:string
   dataDir: string; databasePath: string; publicDir: string;debug?:boolean
+  /** Single display time zone for admin pages, console logs and Excel exports; timestamps stay UTC in the database. */
+  timeZone:string
 }
 
 interface FileConfig {
-  appName?:string;host?:string;port?:number|string;adminUser?:string;adminPassword?:string;operationPassword?:string;dataDir?:string;publicDir?:string;debug?:boolean|string
+  appName?:string;host?:string;port?:number|string;adminUser?:string;adminPassword?:string;operationPassword?:string;dataDir?:string;publicDir?:string;debug?:boolean|string;timezone?:string
 }
 
 export interface ConfigLoadOptions {
@@ -28,7 +31,7 @@ function readJsonConfig(path:string,required:boolean):FileConfig {
   try{parsed=JSON.parse(readFileSync(path,'utf8'))}catch(error){throw new Error(`配置文件 JSON 格式不正确：${path}（${(error as Error).message}）`)}
   if(!parsed||typeof parsed!=='object'||Array.isArray(parsed))throw new Error(`配置文件必须是 JSON 对象：${path}`)
   const config=parsed as Record<string,unknown>
-  for(const key of ['appName','host','adminUser','adminPassword','operationPassword','dataDir','publicDir'])if(config[key]!==undefined&&typeof config[key]!=='string')throw new Error(`配置项 ${key} 必须是字符串`)
+  for(const key of ['appName','host','adminUser','adminPassword','operationPassword','dataDir','publicDir','timezone'])if(config[key]!==undefined&&typeof config[key]!=='string')throw new Error(`配置项 ${key} 必须是字符串`)
   if(config.port!==undefined&&typeof config.port!=='number'&&typeof config.port!=='string')throw new Error('配置项 port 必须是数字')
   if(config.debug!==undefined&&typeof config.debug!=='boolean'&&typeof config.debug!=='string')throw new Error('配置项 debug 必须是布尔值')
   return config as FileConfig
@@ -56,6 +59,7 @@ export function loadConfig(options:ConfigLoadOptions={}):AppConfig {
     operationPassword:argument('operation-password',argv)??env.AUTH_PLATFORM_OPERATION_PASSWORD??file.operationPassword??'Operate+123',
     dataDir,databasePath:resolve(dataDir,'auth-platform.db'),publicDir,
     debug:parseBoolean(cliDebug??env.AUTH_PLATFORM_DEBUG??file.debug??false,'debug'),
+    timeZone:resolveTimeZone(argument('timezone',argv)??env.AUTH_PLATFORM_TIMEZONE??file.timezone),
   }
   if(!Number.isInteger(config.port)||config.port<1||config.port>65535)throw new Error('端口必须在 1-65535 之间')
   if(!config.appName.trim())throw new Error('系统名称不能为空')

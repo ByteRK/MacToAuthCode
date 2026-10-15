@@ -2,6 +2,7 @@ import { mkdirSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { Database } from '../db/database.js'
+import { utcTimestamp } from '../domain/time.js'
 
 const ARCHIVE_PATTERN=/^audit-(\d{4}-\d{2})\.db$/
 const ARCHIVE_SCHEMA=`CREATE TABLE IF NOT EXISTS audit_logs (
@@ -16,7 +17,7 @@ export class AuditArchiveService {
   constructor(private database:Database,dataDir:string,private retentionDays=90){this.directory=join(dataDir,'audit-archives');mkdirSync(this.directory,{recursive:true})}
   /** Copy and commit first; only verified rows are then removed from the live database. */
   archive(now=new Date()){
-    const cutoff=new Date(now.getTime()-this.retentionDays*86_400_000).toISOString().replace('T',' ').replace('Z','')
+    const cutoff=utcTimestamp(new Date(now.getTime()-this.retentionDays*86_400_000))
     const months=this.database.raw.prepare("SELECT DISTINCT substr(created_at,1,7) month FROM audit_logs WHERE created_at<? ORDER BY month").all(cutoff) as {month:string}[]
     let archived=0
     for(const {month} of months){if(/^\d{4}-\d{2}$/.test(month))archived+=this.archiveMonth(month,cutoff)}

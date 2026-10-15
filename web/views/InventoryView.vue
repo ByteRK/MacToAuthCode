@@ -7,6 +7,7 @@ import type { AuthCodeRecord, PageResult } from '../../shared/contracts'
 import { api, json } from '../api/client'
 import PageHeader from '../components/PageHeader.vue'
 import ContentCard from '../components/ContentCard.vue'
+import { formatDateTime } from '../utils/time'
 const loading = ref(false), items = ref<AuthCodeRecord[]>([]), total = ref(0), selected = ref<AuthCodeRecord[]>([])
 const route = useRoute(), router = useRouter()
 const pageValue = (value: unknown, fallback: number) => { const parsed = Number(value); return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback }
@@ -78,7 +79,9 @@ onMounted(load)
         <template #default="{ row }">{{ row.assignedMac || '-' }}</template>
       </el-table-column>
       <el-table-column prop="sourceBatch" label="批次" min-width="120" />
-      <el-table-column prop="assignedAt" label="分配时间" min-width="160" />
+      <el-table-column prop="assignedAt" label="分配时间" min-width="160">
+        <template #default="{ row }">{{ row.assignedAt ? formatDateTime(row.assignedAt) : '-' }}</template>
+      </el-table-column>
       <el-table-column label="操作" width="210" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">

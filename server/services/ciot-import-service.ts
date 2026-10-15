@@ -1,6 +1,7 @@
 import*as XLSX from'xlsx'
 import{normalizePid}from'../domain/normalize.js'
 import{expandSheetRange}from'../domain/excel-sheet.js'
+import{batchStamp,systemTimeZone}from'../domain/time.js'
 import{AuthCodeRepository}from'../repositories/auth-code-repository.js'
 import{AuditService}from'./audit-service.js'
 import type{ImportDuplicate}from'./excel-service.js'
@@ -10,7 +11,7 @@ export interface CiotInvalidStatus{row:number;did:string;status:string}
 
 /** Dedicated adapter for CIOT authorization exports; keep its source-specific rules out of generic Excel import. */
 export class CiotImportService{
-  constructor(private repo:AuthCodeRepository,private audit:AuditService){}
+  constructor(private repo:AuthCodeRepository,private audit:AuditService,private timeZone=systemTimeZone()){}
   preview(buffer:Buffer,pidInput:string,sourceBatch=''){
     const{rows,batch}=this.parse(buffer,pidInput,sourceBatch),invalidStatuses=this.invalidStatuses(rows)
     if(invalidStatuses.length)return{statusValid:false,totalRows:rows.length,validCount:0,duplicateCount:0,sourceBatch:batch,duplicates:[]as ImportDuplicate[],invalidStatuses}
@@ -39,5 +40,5 @@ export class CiotImportService{
   }
   private invalidStatuses(rows:CiotRow[]):CiotInvalidStatus[]{return rows.filter(item=>item.sourceStatus!=='未激活').map(item=>({row:item.row,did:item.did,status:item.sourceStatus||'空状态'}))}
   private partition(rows:CiotRow[]){const valid:CiotRow[]=[],duplicates:ImportDuplicate[]=[],seen=new Set<string>();for(const item of rows){const key=`${item.pid}\u0000${item.did}`,existing=this.repo.findByPidDid(item.pid,item.did);if(existing){duplicates.push({row:item.row,pid:item.pid,did:item.did,duplicateWith:existing.status,duplicateLabel:existing.status==='assigned'?'已分配':'未分配'});continue}if(seen.has(key)){duplicates.push({row:item.row,pid:item.pid,did:item.did,duplicateWith:'file',duplicateLabel:'导入文件内'});continue}seen.add(key);valid.push(item)}return{valid,duplicates}}
-  private currentBatch(){const now=new Date(),part=(value:number)=>String(value).padStart(2,'0');return`${now.getFullYear()}${part(now.getMonth()+1)}${part(now.getDate())}_${part(now.getHours())}${part(now.getMinutes())}`}
+  private currentBatch(){return batchStamp(new Date(),this.timeZone)}
 }

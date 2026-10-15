@@ -5,6 +5,7 @@ import{Cable,Power,RefreshCw,Send}from'lucide-vue-next'
 import{api,json}from'../api/client'
 import PageHeader from'../components/PageHeader.vue'
 import ContentCard from'../components/ContentCard.vue'
+import{formatTimeOfDay}from'../utils/time'
 
 interface Device{serial:string;state:string;model:string;product:string;transportId:string;ready:boolean}
 interface DeviceState{installed:boolean;devices:Device[];error:string}
@@ -16,7 +17,7 @@ const commonInterfaces=['wlan0','eth0','usb0','rndis0','en0']
 let timer:ReturnType<typeof setInterval>|undefined
 const selectedDevice=computed(()=>devices.value.find(item=>item.serial===form.serial))
 const canWrite=computed(()=>!!form.pid&&!!selectedDevice.value?.ready&&!!form.networkInterface.trim()&&!!form.targetPath.trim()&&!!form.template.trim())
-function appendStatus(message:string){const time=new Date().toLocaleTimeString();statusText.value=statusText.value==='等待操作...'?`[${time}] ${message}`:`${statusText.value}\n[${time}] ${message}`}
+function appendStatus(message:string){const time=formatTimeOfDay();statusText.value=statusText.value==='等待操作...'?`[${time}] ${message}`:`${statusText.value}\n[${time}] ${message}`}
 function restore(){try{const saved=JSON.parse(localStorage.getItem(storageKey)??'null');if(saved&&typeof saved==='object')Object.assign(form,defaults,saved)}catch{}}
 async function loadPids(){pids.value=await api<PidOption[]>('/api/admin/pids/options');if(!form.pid&&pids.value.length)form.pid=pids.value[0]!.pid}
 async function checkDevices(manual=false){if(checking.value)return;checking.value=true;try{const state=await api<DeviceState>('/api/admin/adb/devices');adbInstalled.value=state.installed;devices.value=state.devices;deviceError.value=state.error;if(form.serial&&!devices.value.some(item=>item.serial===form.serial))form.serial='';if(!form.serial){const ready=devices.value.find(item=>item.ready);if(ready)form.serial=ready.serial}if(manual)appendStatus(state.error||`检测到 ${state.devices.length} 台 ADB 设备`)}catch(error){deviceError.value=(error as Error).message;if(manual)appendStatus(`设备检测失败：${deviceError.value}`)}finally{checking.value=false}}

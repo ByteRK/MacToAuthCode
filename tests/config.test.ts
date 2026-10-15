@@ -26,4 +26,12 @@ describe('runtime configuration precedence',()=>{
     const dir=workspace();expect(loadConfig({cwd:dir,sea:false,argv:['node','app'],env:{}}).port).toBe(8080)
     expect(()=>loadConfig({cwd:dir,sea:false,argv:['node','app','--config','missing.json'],env:{}})).toThrow('配置文件不存在')
   })
+
+  it('resolves the display time zone from CLI over environment over config.json',()=>{
+    const dir=workspace();writeFileSync(join(dir,'config.json'),JSON.stringify({timezone:'Europe/Berlin'}))
+    expect(loadConfig({cwd:dir,sea:false,argv:['node','app'],env:{}}).timeZone).toBe('Europe/Berlin')
+    expect(loadConfig({cwd:dir,sea:false,argv:['node','app'],env:{AUTH_PLATFORM_TIMEZONE:'Asia/Tokyo'}}).timeZone).toBe('Asia/Tokyo')
+    expect(loadConfig({cwd:dir,sea:false,argv:['node','app','--timezone','UTC'],env:{AUTH_PLATFORM_TIMEZONE:'Asia/Tokyo'}}).timeZone).toBe('UTC')
+    expect(()=>loadConfig({cwd:dir,sea:false,argv:['node','app','--timezone','Not/AZone'],env:{}})).toThrow('时区配置无效')
+  })
 })

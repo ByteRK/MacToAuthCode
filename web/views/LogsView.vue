@@ -6,6 +6,7 @@ import { api } from '../api/client'
 import { useAutoRefresh } from '../composables/useAutoRefresh'
 import PageHeader from '../components/PageHeader.vue'
 import ContentCard from '../components/ContentCard.vue'
+import { formatDateTime } from '../utils/time'
 interface ArchiveOption { file:string;label:string;count:number;oldestAt:string|null;newestAt:string|null }
 const items = ref<any[]>([]), archives = ref<ArchiveOption[]>([]), loading = ref(false), query = reactive({ archive: '', actions: [] as string[], search: '', limit: 50 })
 const labels: Record<string, string> = { assigned: '新分配', reused: '重复返回', exhausted: '库存不足', created: '新增', updated: '编辑', deleted: '删除', unbound: '解除绑定', imported: '导入', migrated: '迁移', adb_write_succeeded: 'ADB 写入成功', adb_write_failed: 'ADB 写入失败', production_counter_started: '启动生产计数', production_counter_stopped: '关闭生产计数', production_counter_reset: '复位生产计数', production_counter_cancelled: '取消生产计数' }
@@ -46,7 +47,9 @@ onMounted(async()=>{await loadArchives();await load()})
             <el-table-column label="序号" width="70" align="center">
                 <template #default="{ $index }">{{ $index + 1 }}</template>
             </el-table-column>
-            <el-table-column prop="createdAt" label="时间" min-width="150" />
+            <el-table-column label="时间" min-width="150">
+                <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+            </el-table-column>
             <el-table-column label="动作" min-width="125">
                 <template #default="{ row }">
                     <el-tag effect="plain">{{ labels[row.action] || row.action }}</el-tag>

@@ -3,6 +3,7 @@ import { AuthCodeRepository } from '../repositories/auth-code-repository.js'
 import { AuditService } from './audit-service.js'
 import { normalizePid } from '../domain/normalize.js'
 import { expandSheetRange } from '../domain/excel-sheet.js'
+import { batchStamp, systemTimeZone, toLocalTimestamp } from '../domain/time.js'
 
 interface ImportRow { row:number;pid:string;did:string;license:string;sourceBatch:string;payload:Record<string,string> }
 export interface ImportDuplicate { row:number;pid:string;did:string;duplicateWith:'available'|'assigned'|'file';duplicateLabel:'未分配'|'已分配'|'导入文件内' }
@@ -11,7 +12,7 @@ export interface ImportPreview { totalRows:number;validCount:number;duplicateCou
 const requiredHeaders=['pid','did','license'] as const
 
 export class ExcelService {
-  constructor(private repo:AuthCodeRepository,private audit:AuditService){}
+  constructor(private repo:AuthCodeRepository,private audit:AuditService,private timeZone=systemTimeZone()){}
 
   preview(buffer:Buffer,sourceBatch='',defaultPid=''):ImportPreview {
     const {rows,batch}=this.parse(buffer,sourceBatch,defaultPid)
@@ -33,8 +34,9 @@ export class ExcelService {
   }
 
   template(){return this.workbook([{pid:'P1001',did:'DID-DEMO-001',license:'LICENSE-DEMO-001'}],'auth_codes_template')}
-  exportAssigned(){const rows=this.repo.list({page:1,pageSize:1_000_000,status:'assigned'}).items.map((x)=>({pid:x.pid,did:x.did,mac:x.assignedMac,source_batch:x.sourceBatch,assigned_at:x.assignedAt,...x.payload}));return this.workbook(rows,'assigned_codes')}
-  exportLogs(){const rows=(this.audit.list(1_000_000) as Record<string,unknown>[]);return this.workbook(rows,'audit_logs')}
+  /** Exports are read by people in the display time zone, so timestamps leave the UTC storage format here. */
+  exportAssigned(){const rows=this.repo.list({page:1,pageSize:1_000_000,status:'assigned'}).items.map((x)=>({pid:x.pid,did:x.did,mac:x.assignedMac,source_batch:x.sourceBatch,assigned_at:toLocalTimestamp(x.assignedAt,this.timeZone)??x.assignedAt,...x.payload}));return this.workbook(rows,'assigned_codes')}
+  exportLogs(){const rows=(this.audit.list(1_000_000) as Record<string,unknown>[]).map(row=>({...row,createdAt:toLocalTimestamp(String(row.createdAt??''),this.timeZone)??row.createdAt}));return this.workbook(rows,'audit_logs')}
 
   private parse(buffer:Buffer,sourceBatch:string,defaultPid:string){
     const workbook=XLSX.read(buffer,{type:'buffer'});const sheet=workbook.Sheets[workbook.SheetNames[0]]
@@ -70,6 +72,6 @@ export class ExcelService {
     return {valid,duplicates}
   }
 
-  private currentBatch(){const now=new Date();const part=(value:number)=>String(value).padStart(2,'0');return `${now.getFullYear()}${part(now.getMonth()+1)}${part(now.getDate())}_${part(now.getHours())}${part(now.getMinutes())}`}
+  private currentBatch(){return batchStamp(new Date(),this.timeZone)}
   private workbook(rows:unknown[],name:string){const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,XLSX.utils.json_to_sheet(rows),name);return XLSX.write(book,{type:'buffer',bookType:'xlsx'}) as Buffer}
 }

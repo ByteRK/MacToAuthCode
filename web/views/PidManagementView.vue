@@ -7,6 +7,7 @@ import type { PageResult } from '../../shared/contracts'
 import { api, json } from '../api/client'
 import PageHeader from '../components/PageHeader.vue'
 import ContentCard from '../components/ContentCard.vue'
+import { formatDateTime } from '../utils/time'
 interface PidItem { pid: string; remark: string; totalCodes: number; availableCodes: number; assignedCodes: number; lastDataAt: string; remarkUpdatedAt: string | null }
 const items = ref<PidItem[]>([]), total = ref(0), loading = ref(false), query = reactive({ page: 1, pageSize: 20, search: '' })
 const router = useRouter(), editingPid = ref(''), remarkDraft = ref(''), applyDialog = ref(false), applyLoading = ref(false), applyPid = ref(''), applyMac = ref(''), applyResult = ref<Record<string, any> | null>(null)
@@ -57,7 +58,9 @@ onMounted(load)
         </template>
       </el-table-column>
       <el-table-column prop="assignedCodes" label="已分配" width="95" />
-      <el-table-column prop="lastDataAt" label="数据更新时间" min-width="165" />
+      <el-table-column prop="lastDataAt" label="数据更新时间" min-width="165">
+        <template #default="{ row }">{{ formatDateTime(row.lastDataAt) }}</template>
+      </el-table-column>
       <el-table-column label="操作" width="260" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
