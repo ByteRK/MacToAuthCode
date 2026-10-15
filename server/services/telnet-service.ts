@@ -10,24 +10,82 @@ export interface TelnetWriteInput { host:string; port:number; username:string; p
 export interface TelnetSession { command(command:string):Promise<string>; close():void }
 export interface TelnetConnector { connect(host:string,port:number,username:string,password:string):Promise<TelnetSession> }
 
+/**
+ * A line-ending `#`/`$`/`>` marks an interactive shell prompt; `>` must not be part of an
+ * arrow such as `->` or `=>`, which often appears in banners. Login/password prompts and
+ * auth failures are matched separately because some embedded servers localize or omit them.
+ */
+const shellPrompt=/(?:^|\n)[^\r\n]{0,120}(?:[#$]|(?<![=\-])>)\s*$/m
+const loginPrompt=/(?:login|username)\s*:\s*$/im
+const passwordPrompt=/password\s*:\s*$/im
+const authFailure=/incorrect|authentication failed|login incorrect/i
+
+/**
+ * Decode raw Telnet bytes into printable text. Telnet control bytes are consumed
+ * incrementally so a sequence split across TCP chunks is still handled correctly:
+ * IAC negotiation (WILL/WONT/DO/DONT), IAC SB ... IAC SE sub-negotiation, and escaped
+ * IAC IAC. ANSI/escape sequences and stray control bytes are dropped; a trailing
+ * incomplete sequence is left in place for the next chunk.
+ */
+function decodeTelnetStream(pending:Buffer):{text:string;consumed:number}{
+  const bytes:number[]=[]
+  let i=0
+  while(i<pending.length){
+    const b=pending[i]
+    if(b===0xff){                                                  // IAC
+      if(i+1>=pending.length)break
+      const n=pending[i+1]
+      if(n===0xff){bytes.push(0xff);i+=2;continue}                 // escaped IAC -> literal 0xff
+      if(n===0xfa){                                                // SB ... IAC SE sub-negotiation
+        let end=-1
+        for(let j=i+2;j+1<pending.length;j++){if(pending[j]===0xff&&pending[j+1]===0xf0){end=j+2;break}}
+        if(end<0)break
+        i=end;continue
+      }
+      i+=2;continue                                                // two-byte negotiation command
+    }
+    if(b===0x1b){                                                  // ANSI / escape sequence
+      if(i+1>=pending.length)break
+      if(pending[i+1]===0x5b){                                     // CSI: ESC [ ... final(0x40-0x7e)
+        let j=i+2
+        while(j<pending.length&&!(pending[j]>=0x40&&pending[j]<=0x7e))j++
+        if(j>=pending.length)break
+        i=j+1;continue
+      }
+      i+=2;continue                                                // two-byte escape sequence
+    }
+    if(b===0x09||b===0x0a||b===0x0d||(b>=0x20&&b!==0x7f))bytes.push(b)
+    i++
+  }
+  return{text:Buffer.from(bytes).toString('latin1'),consumed:i}
+}
+
 /** Minimal interactive Telnet client. Commands are written as protocol data, never through a host shell. */
 export class TcpTelnetConnector implements TelnetConnector {
   async connect(host:string,port:number,username:string,password:string):Promise<TelnetSession> {
     const socket=net.createConnection({host,port});socket.setTimeout(12_000)
     let buffer='';let tail=Promise.resolve();let closed=false
-    socket.on('data',(chunk:Buffer)=>{buffer+=chunk.toString('utf8').replace(/[\xff][\xfb-\xfe]./g,'')})
+    let pending=Buffer.alloc(0)
+    socket.on('data',(chunk:Buffer)=>{pending=Buffer.concat([pending,chunk]);const decoded=decodeTelnetStream(pending);if(decoded.text)buffer+=decoded.text;if(decoded.consumed)pending=pending.subarray(decoded.consumed)})
     await new Promise<void>((resolve,reject)=>{socket.once('connect',()=>resolve());socket.once('error',reject);socket.once('timeout',()=>reject(new Error('Telnet 连接超时')))})
-    const waitFor=async(pattern:RegExp,label:string)=>{const started=Date.now();while(Date.now()-started<10_000){if(pattern.test(buffer))return buffer;await new Promise(resolve=>setTimeout(resolve,40))}throw new Error(`等待 Telnet ${label} 超时：${buffer.slice(-300)}`)}
+    const waitFor=async(pattern:RegExp,label:string,timeout=10_000)=>{const started=Date.now();while(Date.now()-started<timeout){if(pattern.test(buffer))return buffer;await new Promise(resolve=>setTimeout(resolve,40))}throw new Error(`等待 Telnet ${label} 超时：${buffer.slice(-300)}`)}
     const send=(value:string)=>new Promise<void>((resolve,reject)=>socket.write(`${value}\r\n`,error=>error?reject(error):resolve()))
     try {
-      let prompt=await waitFor(/(?:login|username)\s*:\s*$/im,'用户名提示')
-      if(/(?:login|username)\s*:\s*$/im.test(prompt)){await send(username);buffer=''}
-      prompt=await waitFor(/(?:password)\s*:\s*$/im,'密码提示');await send(password);buffer=''
-      await waitFor(/(?:[$#>]\s*$|incorrect|authentication failed|login incorrect)/im,'登录结果')
-      if(/incorrect|authentication failed|login incorrect/i.test(buffer))throw new Error('Telnet 用户名或密码错误')
+      // Empty credentials are common on embedded devices: such servers skip login and drop
+      // straight into a shell, so the first thing to appear may be any of these prompts.
+      const first=await waitFor(new RegExp(`${shellPrompt.source}|${loginPrompt.source}|${passwordPrompt.source}|${authFailure.source}`,'im'),'登录提示')
+      if(authFailure.test(first))throw new Error('Telnet 用户名或密码错误')
+      if(loginPrompt.test(first)){
+        await send(username);buffer=''
+        const next=await waitFor(new RegExp(`${shellPrompt.source}|${passwordPrompt.source}|${authFailure.source}`,'im'),'密码提示或 Shell 提示')
+        if(authFailure.test(next))throw new Error('Telnet 用户名或密码错误')
+        if(passwordPrompt.test(next)){await send(password);buffer='';const loggedIn=await waitFor(new RegExp(`${shellPrompt.source}|${authFailure.source}`,'im'),'登录结果');if(authFailure.test(loggedIn))throw new Error('Telnet 用户名或密码错误')}
+      }else if(passwordPrompt.test(first)){
+        await send(password);buffer='';const loggedIn=await waitFor(new RegExp(`${shellPrompt.source}|${authFailure.source}`,'im'),'登录结果');if(authFailure.test(loggedIn))throw new Error('Telnet 用户名或密码错误')
+      }
       socket.setTimeout(0)
     } catch(error){socket.destroy();throw error}
-    return {command:(command:string)=>{const run=async()=>{if(closed)throw new Error('Telnet 会话已关闭');buffer='';await send(command);await waitFor(/(?:[$#>]\s*$)/m,'命令提示符');return buffer};const result=tail.then(run);tail=result.then(()=>undefined,()=>undefined);return result},close(){closed=true;socket.end()}}
+    return {command:(command:string)=>{const run=async()=>{if(closed)throw new Error('Telnet 会话已关闭');buffer='';await send(command);await waitFor(shellPrompt,'命令提示符',30_000);return buffer};const result=tail.then(run);tail=result.then(()=>undefined,()=>undefined);return result},close(){closed=true;socket.end()}}
   }
 }
 

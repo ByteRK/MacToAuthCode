@@ -1,4 +1,5 @@
 import{mkdtempSync,rmSync}from'node:fs'
+import net from'node:net'
 import{tmpdir}from'node:os'
 import{join}from'node:path'
 import{afterEach,beforeEach,describe,expect,it}from'vitest'
@@ -6,7 +7,7 @@ import{Database}from'../server/db/database.js'
 import{AuthCodeRepository}from'../server/repositories/auth-code-repository.js'
 import{AuditService}from'../server/services/audit-service.js'
 import{DistributionService}from'../server/services/distribution-service.js'
-import{TelnetService,type TelnetConnector,type TelnetSession}from'../server/services/telnet-service.js'
+import{TcpTelnetConnector,TelnetService,type TelnetConnector,type TelnetSession}from'../server/services/telnet-service.js'
 
 class FakeConnector implements TelnetConnector{
   calls:string[]=[];credentials:{host:string;port:number;username:string;password:string}|undefined
@@ -23,4 +24,7 @@ describe('Telnet authorization writer',()=>{
   it('validates the remote host and port',async()=>{const service=new TelnetService(new DistributionService(repo,audit),audit,new FakeConnector());await expect(service.check('',23,'root','secret')).rejects.toThrow('IP');await expect(service.check('192.168.1.8',0,'root','secret')).rejects.toThrow('端口')})
   it('reboots through the authenticated Telnet session without writing audit logs',async()=>{const connector=new FakeConnector(),service=new TelnetService(new DistributionService(repo,audit),audit,connector);await expect(service.reboot('192.168.1.8',23,'root','')).resolves.toEqual({host:'192.168.1.8',port:23,rebooting:true});expect(connector.calls).toEqual(['reboot']);expect(audit.list(10)).toHaveLength(0)})
   it('allows an empty username',async()=>{const connector=new FakeConnector(),service=new TelnetService(new DistributionService(repo,audit),audit,connector);await expect(service.check('192.168.1.8',23,'','')).resolves.toMatchObject({connected:true});expect(connector.credentials).toMatchObject({username:'',password:''})})
+  it('accepts a direct shell prompt when the device has an empty account and password',async()=>{const server=net.createServer(socket=>{socket.write(Buffer.from([255,251,1,255,251,31,255,250,31,0,80,0,24,255,240]));socket.write('\r\nsh-5.2# ');socket.on('data',data=>{const command=data.toString().trim();if(command==='exit')socket.end();else socket.write(`\r\nsh-5.2# `)})});await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));const address=server.address();if(!address||typeof address==='string')throw new Error('missing test server address');try{const session=await new TcpTelnetConnector().connect('127.0.0.1',address.port,'','');const output=await session.command('echo ready');expect(output).toContain('sh-5.2#');expect(output).not.toContain('\uFFFD');expect(output).not.toContain('ÿ');session.close()}finally{await new Promise<void>(resolve=>server.close(()=>resolve()))}})
+  it('completes a username/password login end to end',async()=>{const server=net.createServer(socket=>{let stage='user';socket.write(Buffer.from([255,253,1]));socket.write('\r\nlogin: ');socket.on('data',data=>{const text=data.toString().trim();if(stage==='user'){socket.write('\r\npassword: ');stage='pass'}else if(stage==='pass'){socket.write('\r\nsh-5.2# ');stage='done'}else if(text==='exit')socket.end();else socket.write(`\r\nsh-5.2# `)})});await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));const address=server.address();if(!address||typeof address==='string')throw new Error('missing test server address');try{const session=await new TcpTelnetConnector().connect('127.0.0.1',address.port,'root','secret');await expect(session.command('echo ready')).resolves.toContain('sh-5.2#');session.close()}finally{await new Promise<void>(resolve=>server.close(()=>resolve()))}})
+  it('rejects a bad password after the password prompt',async()=>{const server=net.createServer(socket=>{let stage='user';socket.write('\r\nlogin: ');socket.on('data',data=>{const text=data.toString().trim();if(stage==='user'){socket.write('\r\npassword: ');stage='pass'}else{socket.write('\r\nLogin incorrect\r\nlogin: ');stage='user'}})});await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));const address=server.address();if(!address||typeof address==='string')throw new Error('missing test server address');try{await expect(new TcpTelnetConnector().connect('127.0.0.1',address.port,'root','wrong')).rejects.toThrow('用户名或密码错误')}finally{await new Promise<void>(resolve=>server.close(()=>resolve()))}})
 })
