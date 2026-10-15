@@ -10,6 +10,15 @@ import{ExcelService}from'../server/services/excel-service.js'
 
 function workbook(rows:Record<string,string>[]){const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,XLSX.utils.json_to_sheet(rows),'codes');return XLSX.write(book,{type:'buffer',bookType:'xlsx'})as Buffer}
 
+/** 复现第三方工具（如 openpyxl）写出偏小 dimension 的文件：单元格完整存在，但 <dimension> 只覆盖前两行。 */
+function truncatedWorkbook(rows:Record<string,string>[]){
+  const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,XLSX.utils.json_to_sheet(rows),'codes')
+  const raw=XLSX.write(book,{type:'buffer',bookType:'xlsx',compression:false})as Buffer
+  // 等长替换 dimension 中的行号，避免破坏 zip 的存储布局。
+  const patched=raw.toString('latin1').replace(/(<dimension ref="A1:[A-Z]+)(\d+)(")/,(_match,head:string,digits:string,tail:string)=>`${head}${'0'.repeat(digits.length-1)}2${tail}`)
+  return Buffer.from(patched,'latin1')
+}
+
 describe('Excel inventory import',()=>{
   let dir:string,database:Database,repo:AuthCodeRepository,service:ExcelService
   beforeEach(()=>{dir=mkdtempSync(join(tmpdir(),'auth-excel-test-'));database=new Database(join(dir,'db.sqlite'));repo=new AuthCodeRepository(database);service=new ExcelService(repo,new AuditService(database))})
@@ -31,6 +40,12 @@ describe('Excel inventory import',()=>{
   it('creates a template containing only pid, did and license columns',()=>{
     const book=XLSX.read(service.template(),{type:'buffer'});const rows=XLSX.utils.sheet_to_json<Record<string,string>>(book.Sheets[book.SheetNames[0]])
     expect(Object.keys(rows[0])).toEqual(['pid','did','license'])
+  })
+
+  it('reads every row when the file declares a smaller dimension than its real data range',()=>{
+    const file=truncatedWorkbook([{pid:'P1',did:'D1',license:'L1'},{pid:'P2',did:'D2',license:'L2'},{pid:'P3',did:'D3',license:'L3'}])
+    expect(service.preview(file)).toMatchObject({totalRows:3,validCount:3,duplicateCount:0})
+    expect(service.import(file,'BATCH-T').inserted).toBe(3)
   })
 
   it('uses the page PID only when the workbook has no pid column',()=>{

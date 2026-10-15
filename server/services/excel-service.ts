@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx'
 import { AuthCodeRepository } from '../repositories/auth-code-repository.js'
 import { AuditService } from './audit-service.js'
 import { normalizePid } from '../domain/normalize.js'
+import { expandSheetRange } from '../domain/excel-sheet.js'
 
 interface ImportRow { row:number;pid:string;did:string;license:string;sourceBatch:string;payload:Record<string,string> }
 export interface ImportDuplicate { row:number;pid:string;did:string;duplicateWith:'available'|'assigned'|'file';duplicateLabel:'未分配'|'已分配'|'导入文件内' }
@@ -38,6 +39,8 @@ export class ExcelService {
   private parse(buffer:Buffer,sourceBatch:string,defaultPid:string){
     const workbook=XLSX.read(buffer,{type:'buffer'});const sheet=workbook.Sheets[workbook.SheetNames[0]]
     if(!sheet)throw new Error('Excel 中没有工作表')
+    // 第三方工具生成的 xlsx 可能声明了偏小的 dimension，先按真实单元格校正范围，避免丢行。
+    expandSheetRange(sheet)
     const rawRows=XLSX.utils.sheet_to_json<Record<string,unknown>>(sheet,{defval:''})
     if(!rawRows.length)throw new Error('Excel 中没有可导入的数据')
     const headerMap=new Map(Object.keys(rawRows[0]).map(header=>[header.trim().toLowerCase(),header]))

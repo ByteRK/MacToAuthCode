@@ -1,5 +1,6 @@
 import*as XLSX from'xlsx'
 import{normalizePid}from'../domain/normalize.js'
+import{expandSheetRange}from'../domain/excel-sheet.js'
 import{AuthCodeRepository}from'../repositories/auth-code-repository.js'
 import{AuditService}from'./audit-service.js'
 import type{ImportDuplicate}from'./excel-service.js'
@@ -27,6 +28,8 @@ export class CiotImportService{
   private parse(buffer:Buffer,pidInput:string,sourceBatch:string){
     const pid=normalizePid(pidInput),book=XLSX.read(buffer,{type:'buffer'}),sheet=book.Sheets[book.SheetNames[0]]
     if(!sheet)throw new Error('Excel 中没有工作表')
+    // 与常规导入一致：先纠正第三方工具写入的偏小 dimension，避免只读到前几行。
+    expandSheetRange(sheet)
     const rawRows=XLSX.utils.sheet_to_json<Record<string,unknown>>(sheet,{defval:''});if(!rawRows.length)throw new Error('Excel 中没有可导入的数据')
     const headers=new Map(Object.keys(rawRows[0]).map(header=>[header.trim(),header])),required=['申请表流水号','sn码','许可证','状态']
     const missing=required.filter(header=>!headers.has(header));if(missing.length)throw new Error(`CIOT 文件缺少必填列：${missing.join('、')}`)

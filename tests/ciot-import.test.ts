@@ -10,6 +10,13 @@ import{CiotImportService}from'../server/services/ciot-import-service.js'
 
 const workbook=(rows:Record<string,string>[])=>{const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,XLSX.utils.json_to_sheet(rows),'CIOT');return XLSX.write(book,{type:'buffer',bookType:'xlsx'})as Buffer}
 const row=(sn:string,status='未激活')=>({申请表流水号:'ac-test',sn码:sn,许可证:`LICENSE-${sn}`,状态:status})
+/** 复现第三方工具写出偏小 dimension 的文件，用于验证 CIOT 导入同样不会丢行。 */
+const truncatedWorkbook=(rows:Record<string,string>[])=>{
+  const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,XLSX.utils.json_to_sheet(rows),'CIOT')
+  const raw=XLSX.write(book,{type:'buffer',bookType:'xlsx',compression:false})as Buffer
+  const patched=raw.toString('latin1').replace(/(<dimension ref="A1:[A-Z]+)(\d+)(")/,(_match,head:string,digits:string,tail:string)=>`${head}${'0'.repeat(digits.length-1)}2${tail}`)
+  return Buffer.from(patched,'latin1')
+}
 
 describe('CIOT source import',()=>{
   let dir:string,database:Database,repo:AuthCodeRepository,service:CiotImportService
@@ -18,5 +25,6 @@ describe('CIOT source import',()=>{
   it('maps sn and license without source-specific custom payload',()=>{const file=workbook([row('SN-1'),row('SN-2')]),preview=service.preview(file,'CIOT-PID','BATCH-1');expect(preview).toMatchObject({statusValid:true,totalRows:2,validCount:2,duplicateCount:0});service.import(file,'CIOT-PID','BATCH-1');expect(repo.findByPidDid('CIOT-PID','SN-1')).toMatchObject({license:'LICENSE-SN-1',sourceBatch:'BATCH-1',payload:{did:'SN-1',license:'LICENSE-SN-1'}})})
   it('rejects the entire file when any source status is not inactive',()=>{const file=workbook([row('SN-1'),row('SN-2','已激活')]),preview=service.preview(file,'CIOT-PID');expect(preview).toMatchObject({statusValid:false,validCount:0,invalidStatuses:[{row:3,did:'SN-2',status:'已激活'}]});expect(()=>service.import(file,'CIOT-PID')).toThrow('已拒绝整次导入');expect(repo.findByPidDid('CIOT-PID','SN-1')).toBeNull()})
   it('uses the standard duplicate preview after status validation',()=>{repo.create({pid:'CIOT-PID',did:'SN-1',license:'OLD',payload:{}});const preview=service.preview(workbook([row('SN-1'),row('SN-2'),row('SN-2')]),'CIOT-PID');expect(preview).toMatchObject({statusValid:true,validCount:1,duplicateCount:2});expect(preview.duplicates.map(item=>item.duplicateLabel)).toEqual(['未分配','导入文件内'])})
+  it('reads every row when the file declares a smaller dimension than its real data range',()=>{const file=truncatedWorkbook([row('SN-1'),row('SN-2'),row('SN-3','已激活')]);const preview=service.preview(file,'CIOT-PID');expect(preview).toMatchObject({totalRows:3,statusValid:false,invalidStatuses:[{row:4,did:'SN-3',status:'已激活'}]});expect(service.preview(truncatedWorkbook([row('SN-1'),row('SN-2')]),'CIOT-PID')).toMatchObject({totalRows:2,validCount:2})})
   it('converts every source row to the generic three-column format without database or audit writes',()=>{repo.create({pid:'EXISTING',did:'D0',license:'L0',payload:{}});const audit=new AuditService(database),converter=new CiotImportService(repo,audit),file=workbook([row('SN-1'),row('SN-2','已激活')]);expect(converter.conversionPreview(file,'TARGET')).toMatchObject({totalRows:2,statusValid:false,invalidStatuses:[{row:3,did:'SN-2',status:'已激活'}]});const converted=XLSX.read(converter.convert(file,'TARGET'),{type:'buffer'}),rows=XLSX.utils.sheet_to_json<Record<string,string>>(converted.Sheets[converted.SheetNames[0]]);expect(rows).toEqual([{pid:'TARGET',did:'SN-1',license:'LICENSE-SN-1'},{pid:'TARGET',did:'SN-2',license:'LICENSE-SN-2'}]);expect(repo.list({page:1,pageSize:20}).total).toBe(1);expect(audit.list(20)).toHaveLength(0)})
 })
