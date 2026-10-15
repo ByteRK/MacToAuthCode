@@ -64,7 +64,8 @@ export class AuthCodeRepository {
   }
   summary() {
     const row=this.database.raw.prepare("SELECT COUNT(*) totalCodes,COUNT(DISTINCT pid) pidCount,SUM(status='available') availableCodes,SUM(status='assigned') assignedCodes FROM auth_codes").get() as DbRow
-    const requests=(this.database.raw.prepare("SELECT COUNT(*) count FROM audit_logs WHERE action IN ('assigned','reused','exhausted')").get() as {count:number}).count
+    // 累计授权请求包含所有到达设备接口并被记录结果的请求，因此停止分发导致的拒绝与库存不足同为一次请求。
+    const requests=(this.database.raw.prepare("SELECT COUNT(*) count FROM audit_logs WHERE action IN ('assigned','reused','exhausted','distribution_stopped')").get() as {count:number}).count
     return { totalCodes:Number(row.totalCodes),pidCount:Number(row.pidCount),availableCodes:Number(row.availableCodes??0),assignedCodes:Number(row.assignedCodes??0),distributionRequests:Number(requests) }
   }
 }

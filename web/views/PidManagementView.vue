@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { Download, Eye, RefreshCw, Search, Send, Upload } from 'lucide-vue-next'
-import { ElMessage } from 'element-plus'
+import { Download, Eye, Pause, Play, RefreshCw, Search, Send, Upload } from 'lucide-vue-next'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import type { PageResult } from '../../shared/contracts'
 import { api, json } from '../api/client'
 import PageHeader from '../components/PageHeader.vue'
 import ContentCard from '../components/ContentCard.vue'
 import { formatDateTime } from '../utils/time'
-interface PidItem { pid: string; remark: string; totalCodes: number; availableCodes: number; assignedCodes: number; lastDataAt: string; remarkUpdatedAt: string | null }
+interface PidItem { pid: string; remark: string; distributionActive: number; totalCodes: number; availableCodes: number; assignedCodes: number; lastDataAt: string; remarkUpdatedAt: string | null }
 const items = ref<PidItem[]>([]), total = ref(0), loading = ref(false), query = reactive({ page: 1, pageSize: 20, search: '' })
 const router = useRouter(), editingPid = ref(''), remarkDraft = ref(''), applyDialog = ref(false), applyLoading = ref(false), applyPid = ref(''), applyMac = ref(''), applyResult = ref<Record<string, any> | null>(null)
 const remarkFileInput=ref<HTMLInputElement|null>(null),importingRemarks=ref(false)
@@ -17,6 +17,7 @@ function startRemarkEdit(row: PidItem) { editingPid.value = row.pid; remarkDraft
 function cancelRemarkEdit() { editingPid.value = '' }
 async function saveRemark(row: PidItem) { if (editingPid.value !== row.pid) return; editingPid.value = ''; const next = remarkDraft.value.trim(); if (next === row.remark) return; try { await api(`/api/admin/pids/${encodeURIComponent(row.pid)}/remark`, json('PUT', { remark: next })); row.remark = next; ElMessage.success('产品备注已保存') } catch (error) { editingPid.value = row.pid; ElMessage.error((error as Error).message) } }
 function showDetails(row: PidItem) { router.push({ path: '/inventory', query: { pid: row.pid } }) }
+async function toggleDistribution(row:PidItem){const active=row.distributionActive!==1;try{await ElMessageBox.confirm(active?`启动 ${row.pid} 后，新设备请求可以继续领取授权码。`:`停止 ${row.pid} 后，将拒绝新的授权码分配；`,'确认操作',{type:active?'success':'warning',confirmButtonText:active?'启动分发':'停止分发',cancelButtonText:'取消'});await api(`/api/admin/pids/${encodeURIComponent(row.pid)}/distribution`,json('PUT',{active}));row.distributionActive=active?1:0;ElMessage.success(active?'已启动授权码分发':'已停止授权码分发')}catch(error){if(error!=='cancel'&&error!=='close')ElMessage.error((error as Error).message)}}
 function inventoryStatus(count: number) { return count === 0 ? { type: 'danger', label: '无可用库存' } : count <= 10 ? { type: 'warning', label: '库存偏低' } : { type: 'success', label: '库存充足' } }
 function openApply(row: PidItem) { applyPid.value = row.pid; applyMac.value = ''; applyResult.value = null; applyDialog.value = true }
 async function applyCode() { applyLoading.value = true; try { applyResult.value = await api('/api/device/authorize', json('POST', { pid: applyPid.value, mac: applyMac.value })); ElMessage.success('授权码申请成功'); load() } catch (error) { ElMessage.error((error as Error).message) } finally { applyLoading.value = false } }
@@ -58,13 +59,17 @@ onMounted(load)
         </template>
       </el-table-column>
       <el-table-column prop="assignedCodes" label="已分配" width="95" />
+      <el-table-column label="分发状态" width="105">
+        <template #default="{ row }"><el-tag :type="row.distributionActive===1?'success':'info'" effect="light">{{ row.distributionActive===1?'运行中':'已停止' }}</el-tag></template>
+      </el-table-column>
       <el-table-column prop="lastDataAt" label="数据更新时间" min-width="165">
         <template #default="{ row }">{{ formatDateTime(row.lastDataAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="260" fixed="right">
+      <el-table-column label="操作" width="360" fixed="right">
         <template #default="{ row }">
           <div class="table-actions">
-            <el-button size="small" type="primary" plain :icon="Send" :disabled="row.availableCodes === 0"
+            <el-button size="small" :type="row.distributionActive===1?'warning':'success'" plain :icon="row.distributionActive===1?Pause:Play" @click="toggleDistribution(row)">{{ row.distributionActive===1?'停止分发':'启动分发' }}</el-button>
+            <el-button size="small" type="primary" plain :icon="Send" :disabled="row.availableCodes === 0 || row.distributionActive !== 1"
               @click="openApply(row)">申请授权码</el-button>
             <el-button size="small" :icon="Eye" @click="showDetails(row)">查看数据</el-button>
           </div>

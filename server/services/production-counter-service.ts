@@ -1,4 +1,5 @@
 import { Database } from '../db/database.js'
+import type { AuditAction } from '../../shared/contracts.js'
 import { normalizePid } from '../domain/normalize.js'
 import { AuditService } from './audit-service.js'
 
@@ -41,7 +42,7 @@ export class ProductionCounterService {
     if(!row)throw new Error('生产计数不存在')
     return decode(row)
   }
-  private record(action:string,label:string,counter:ReturnType<typeof decode>){
+  private record(action:AuditAction,label:string,counter:ReturnType<typeof decode>){
     const note=counter.note||'无'
     this.audit.record({action,entityType:'production_counter',pid:counter.pid,message:`${label}；实时数量：${counter.count}；目标数量：${counter.targetCount}；备注：${note}`,snapshot:{count:counter.count,targetCount:counter.targetCount,note:counter.note}})
   }

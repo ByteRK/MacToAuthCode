@@ -10,6 +10,8 @@ export class DistributionService {
     return this.repository.database.transaction(() => {
       const existing=this.repository.findAssigned(pid,mac)
       if(existing){ this.audit.record({action:'reused',entityId:existing.id,pid,mac,did:existing.did,clientIp,message:'设备重复请求，返回已分配授权码'}); return this.response(existing,'reused','授权码已存在，返回原结果') }
+      const control=this.repository.database.raw.prepare('SELECT active FROM pid_distribution_controls WHERE pid=?').get(pid) as {active:number}|undefined
+      if(control?.active===0){this.audit.record({action:'distribution_stopped',pid,mac,clientIp,message:'PID 已停止授权码分发'});return{status:409,body:{success:false,message:'该 PID 已停止授权码分发',data:{pid,mac}}}}
       const assigned=this.repository.claimNext(pid,mac)
       if(!assigned){ this.audit.record({action:'exhausted',pid,mac,clientIp,message:'授权码库存不足'}); return { status:409, body:{success:false,message:'当前没有可分配的授权码',data:{pid,mac}} } }
       this.counters?.increment(pid)

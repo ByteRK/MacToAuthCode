@@ -8,12 +8,19 @@ export class PidService {
     const search=query.search.trim(),where=search?"WHERE c.pid LIKE ? ESCAPE '\\' OR COALESCE(m.remark,'') LIKE ? ESCAPE '\\'":''
     const params=search?[`%${escapeLike(search)}%`,`%${escapeLike(search)}%`]:[]
     const total=Number((this.database.raw.prepare(`SELECT COUNT(DISTINCT c.pid) total FROM auth_codes c LEFT JOIN pid_metadata m ON m.pid=c.pid ${where}`).get(...params) as {total:number}).total)
-    const items=this.database.raw.prepare(`SELECT c.pid,COALESCE(m.remark,'') remark,COUNT(*) totalCodes,
+    const items=this.database.raw.prepare(`SELECT c.pid,COALESCE(m.remark,'') remark,COALESCE(d.active,1) distributionActive,COUNT(*) totalCodes,
       SUM(c.status='available') availableCodes,SUM(c.status='assigned') assignedCodes,
       MAX(c.updated_at) lastDataAt,m.updated_at remarkUpdatedAt
-      FROM auth_codes c LEFT JOIN pid_metadata m ON m.pid=c.pid ${where}
-      GROUP BY c.pid,m.remark,m.updated_at ORDER BY c.pid COLLATE NOCASE ASC,c.pid ASC LIMIT ? OFFSET ?`).all(...params,query.pageSize,(query.page-1)*query.pageSize)
+      FROM auth_codes c LEFT JOIN pid_metadata m ON m.pid=c.pid LEFT JOIN pid_distribution_controls d ON d.pid=c.pid ${where}
+      GROUP BY c.pid,m.remark,m.updated_at,d.active ORDER BY c.pid COLLATE NOCASE ASC,c.pid ASC LIMIT ? OFFSET ?`).all(...params,query.pageSize,(query.page-1)*query.pageSize)
     return {items,total,page:query.page,pageSize:query.pageSize}
+  }
+  setDistribution(pidInput:string,active:boolean){
+    const pid=normalizePid(pidInput)
+    this.database.raw.prepare(`INSERT INTO pid_distribution_controls(pid,active,updated_at) VALUES(?,?,CURRENT_TIMESTAMP)
+      ON CONFLICT(pid) DO UPDATE SET active=excluded.active,updated_at=CURRENT_TIMESTAMP`).run(pid,active?1:0)
+    this.audit.record({action:'updated',entityType:'pid',pid,message:active?'启动 PID 授权码分发':'停止 PID 授权码分发',snapshot:{distributionActive:active}})
+    return {pid,distributionActive:active}
   }
   options(){return this.database.raw.prepare(`SELECT c.pid,COALESCE(m.remark,'') remark FROM auth_codes c LEFT JOIN pid_metadata m ON m.pid=c.pid GROUP BY c.pid,m.remark ORDER BY c.pid COLLATE NOCASE ASC,c.pid ASC`).all() as{pid:string;remark:string}[]}
   updateRemark(pidInput:string,remarkInput:string){
