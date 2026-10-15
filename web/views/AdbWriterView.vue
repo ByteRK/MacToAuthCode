@@ -37,7 +37,7 @@ onUnmounted(()=>{if(timer)clearInterval(timer)})
     <template #default><div class="install-help">程序不内置 ADB。Windows 请安装 <a href="https://developer.android.com/tools/releases/platform-tools" target="_blank">Android SDK Platform Tools</a> 并将 adb 加入 PATH；Linux 可安装系统软件包 <code>adb</code>；macOS 可执行 <code>brew install android-platform-tools</code>。安装后请重启本服务。</div></template>
   </el-alert>
   <div class="adb-grid">
-    <ContentCard title="写入设置" description="网卡名称、推送路径和模板会保存在当前浏览器中。">
+    <ContentCard title="写入设置" description=" ">
       <el-form label-position="top">
         <div class="form-grid">
           <el-form-item label="PID" required><el-select v-model="form.pid" filterable placeholder="选择 PID"><el-option v-for="item in pids" :key="item.pid" :value="item.pid" :label="item.remark?`${item.pid} · ${item.remark}`:item.pid"/></el-select></el-form-item>
