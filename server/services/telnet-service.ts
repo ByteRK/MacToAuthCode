@@ -34,10 +34,9 @@ export class TcpTelnetConnector implements TelnetConnector {
 export class TelnetService {
   constructor(private distribution:DistributionService,private audit:AuditService,private connector:TelnetConnector=new TcpTelnetConnector()){}
   async check(hostInput:string,portInput:number,username:string,password:string){const host=this.host(hostInput),port=this.port(portInput);const session=await this.connector.connect(host,port,username,password);session.close();return{connected:true,host,port}}
-  async reboot(hostInput:string,portInput:number,usernameInput:string,password:string){const host=this.host(hostInput),port=this.port(portInput),username=usernameInput.trim();if(!username)throw new Error('请输入 Telnet 用户名');const session=await this.connector.connect(host,port,username,password);try{await session.command('reboot')}finally{session.close()}return{host,port,rebooting:true as const}}
+  async reboot(hostInput:string,portInput:number,usernameInput:string,password:string){const host=this.host(hostInput),port=this.port(portInput),username=usernameInput.trim();const session=await this.connector.connect(host,port,username,password);try{await session.command('reboot')}finally{session.close()}return{host,port,rebooting:true as const}}
   async write(input:TelnetWriteInput){
     const host=this.host(input.host),port=this.port(input.port),username=input.username.trim(),networkInterface=input.networkInterface.trim(),targetPath=input.targetPath.trim(),template=input.template
-    if(!username)throw new Error('请输入 Telnet 用户名')
     if(!/^[A-Za-z0-9_.:-]{1,64}$/.test(networkInterface))throw new Error('网卡名称格式不正确')
     if(!targetPath.startsWith('/')||targetPath.includes('\0')||/[\r\n]/.test(targetPath))throw new Error('写入路径必须是设备端完整绝对路径')
     for(const slot of['{{pid}}','{{did}}','{{license}}'])if(!template.includes(slot))throw new Error(`文本模板缺少槽位：${slot}`)

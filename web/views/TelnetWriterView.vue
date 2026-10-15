@@ -12,7 +12,7 @@ const storageKey='auth-platform:telnet-writer-settings'
 const defaults={host:'',port:23,username:'root',password:'',networkInterface:'eth0',pid:'',targetPath:'/etc/license.txt',template:'pid={{pid}}\ndid={{did}}\nlicense={{license}}'}
 const form=reactive({...defaults}),pids=ref<PidOption[]>([]),checking=ref(false),writing=ref(false),rebooting=ref(false),connected=ref(false),connectionError=ref('尚未检测连接'),statusText=ref('等待操作...')
 const commonInterfaces=['eth0','wlan0','usb0','br0','en0']
-const canCheck=computed(()=>!!form.host.trim()&&!!form.username.trim())
+const canCheck=computed(()=>!!form.host.trim())
 const canWrite=computed(()=>canCheck.value&&connected.value&&!!form.pid&&!!form.networkInterface.trim()&&!!form.targetPath.trim()&&!!form.template.trim())
 function appendStatus(message:string){const time=formatTimeOfDay();statusText.value=statusText.value==='等待操作...'?`[${time}] ${message}`:`${statusText.value}\n[${time}] ${message}`}
 function restore(){try{const saved=JSON.parse(localStorage.getItem(storageKey)??'null');if(saved&&typeof saved==='object')Object.assign(form,defaults,saved)}catch{}}
@@ -36,7 +36,7 @@ onMounted(async()=>{restore();await loadPids()})
         <div class="form-grid">
           <el-form-item label="设备 IP 地址" required><el-input v-model="form.host" placeholder="例如 192.168.1.20"/></el-form-item>
           <el-form-item label="Telnet 端口" required><el-input-number v-model="form.port" :min="1" :max="65535" controls-position="right"/></el-form-item>
-          <el-form-item label="用户名" required><el-input v-model="form.username" autocomplete="username"/></el-form-item>
+          <el-form-item label="用户名（可留空）"><el-input v-model="form.username" autocomplete="username"/></el-form-item>
           <el-form-item label="密码（可留空）"><el-input v-model="form.password" type="password" show-password autocomplete="current-password"/></el-form-item>
           <el-form-item label="PID" required><el-select v-model="form.pid" filterable placeholder="选择 PID"><el-option v-for="item in pids" :key="item.pid" :value="item.pid" :label="item.remark?`${item.pid} · ${item.remark}`:item.pid"/></el-select></el-form-item>
           <el-form-item label="网卡名称" required><el-select v-model="form.networkInterface" filterable allow-create default-first-option placeholder="选择或输入网卡名称"><el-option v-for="item in commonInterfaces" :key="item" :value="item" :label="item"/></el-select></el-form-item>
